@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus } from 'lucide-react';
+import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2 } from 'lucide-react';
 
 // Backend API URL - Für lokale Entwicklung
 const API_URL = 'http://localhost:3000/api';
@@ -19,7 +19,10 @@ const HouseholdPlanner = () => {
   const [tasks, setTasks] = useState([]);
   const [categories, setCategories] = useState([]);
   const [showAddTask, setShowAddTask] = useState(false);
+  const [showEditTask, setShowEditTask] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
   const [newTask, setNewTask] = useState({ title: '', category: '', deadline: '' });
   const [newCategory, setNewCategory] = useState({ name: '', color: '#3b82f6' });
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -208,6 +211,47 @@ const HouseholdPlanner = () => {
     }
   };
 
+  // Aufgabe bearbeiten öffnen
+  const openEditTask = (task) => {
+    setEditingTask({
+      ...task,
+      deadline: task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : ''
+    });
+    setShowEditTask(true);
+  };
+
+  // Aufgabe bearbeiten speichern
+  const handleEditTask = async () => {
+    if (!editingTask.title || !editingTask.category) {
+      alert('Bitte Titel und Kategorie angeben!');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/tasks/${editingTask._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: editingTask.title,
+          category: editingTask.category,
+          deadline: editingTask.deadline
+        }),
+      });
+
+      if (!response.ok) throw new Error('Fehler beim Aktualisieren');
+
+      const updatedTask = await response.json();
+      setTasks(tasks.map(t => t._id === updatedTask._id ? updatedTask : t));
+      setShowEditTask(false);
+      setEditingTask(null);
+    } catch (error) {
+      alert('Fehler beim Aktualisieren der Aufgabe');
+    }
+  };
+
   // Aufgabe aktualisieren
   const updateTask = async (taskId, updates) => {
     try {
@@ -236,6 +280,8 @@ const HouseholdPlanner = () => {
 
   // Aufgabe löschen
   const deleteTask = async (taskId) => {
+    if (!confirm('Möchtest du diese Aufgabe wirklich löschen?')) return;
+
     try {
       const response = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'DELETE',
@@ -280,6 +326,8 @@ const HouseholdPlanner = () => {
 
   // Kategorie löschen
   const deleteCategory = async (categoryId) => {
+    if (!confirm('Möchtest du diese Kategorie wirklich löschen?')) return;
+
     try {
       const response = await fetch(`${API_URL}/categories/${categoryId}`, {
         method: 'DELETE',
@@ -417,13 +465,22 @@ const HouseholdPlanner = () => {
               <p className="text-sm text-gray-600">Hallo, {currentUser?.name}!</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-            <span>Abmelden</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              <Settings className="w-5 h-5" />
+              <span className="hidden sm:inline">Einstellungen</span>
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              <LogOut className="w-5 h-5" />
+              <span className="hidden sm:inline">Abmelden</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -431,13 +488,6 @@ const HouseholdPlanner = () => {
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-gray-800">Kategorien</h2>
-            <button
-              onClick={() => setShowAddCategory(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-            >
-              <FolderPlus className="w-4 h-4" />
-              Neue Kategorie
-            </button>
           </div>
 
           <div className="flex flex-wrap gap-2 mb-4">
@@ -452,27 +502,20 @@ const HouseholdPlanner = () => {
               Alle ({tasks.length})
             </button>
             {categories.map(cat => (
-              <div key={cat._id} className="flex items-center gap-1">
-                <button
-                  onClick={() => setSelectedCategory(cat._id)}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    selectedCategory === cat._id
-                      ? 'text-white'
-                      : 'text-gray-700 hover:opacity-80'
-                  }`}
-                  style={{
-                    backgroundColor: selectedCategory === cat._id ? cat.color : `${cat.color}40`
-                  }}
-                >
-                  {cat.name} ({tasks.filter(t => t.category === cat._id).length})
-                </button>
-                <button
-                  onClick={() => deleteCategory(cat._id)}
-                  className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                key={cat._id}
+                onClick={() => setSelectedCategory(cat._id)}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  selectedCategory === cat._id
+                    ? 'text-white'
+                    : 'text-gray-700 hover:opacity-80'
+                }`}
+                style={{
+                  backgroundColor: selectedCategory === cat._id ? cat.color : `${cat.color}40`
+                }}
+              >
+                {cat.name} ({tasks.filter(t => t.category === cat._id).length})
+              </button>
             ))}
           </div>
 
@@ -485,6 +528,75 @@ const HouseholdPlanner = () => {
           </button>
         </div>
 
+        {/* Einstellungen Modal */}
+        {showSettings && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-800">Einstellungen</h3>
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="p-2 text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-lg font-semibold text-gray-800">Kategorien verwalten</h4>
+                  <button
+                    onClick={() => setShowAddCategory(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    <FolderPlus className="w-4 h-4" />
+                    Neue Kategorie
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {categories.length === 0 ? (
+                    <p className="text-gray-500 text-center py-8">Keine Kategorien vorhanden</p>
+                  ) : (
+                    categories.map(cat => (
+                      <div
+                        key={cat._id}
+                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-6 h-6 rounded"
+                            style={{ backgroundColor: cat.color }}
+                          />
+                          <span className="font-medium text-gray-800">{cat.name}</span>
+                          <span className="text-sm text-gray-500">
+                            ({tasks.filter(t => t.category === cat._id).length} Aufgaben)
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => deleteCategory(cat._id)}
+                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h4 className="text-lg font-semibold text-gray-800 mb-4">Konto</h4>
+                <div className="space-y-2">
+                  <p className="text-gray-600"><strong>Name:</strong> {currentUser?.name}</p>
+                  <p className="text-gray-600"><strong>E-Mail:</strong> {currentUser?.email}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Neue Kategorie Modal */}
         {showAddCategory && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-xl p-6 w-full max-w-md">
@@ -526,6 +638,7 @@ const HouseholdPlanner = () => {
           </div>
         )}
 
+        {/* Neue Aufgabe Modal */}
         {showAddTask && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-xl p-6 w-full max-w-md">
@@ -574,6 +687,56 @@ const HouseholdPlanner = () => {
           </div>
         )}
 
+        {/* Aufgabe bearbeiten Modal */}
+        {showEditTask && editingTask && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Aufgabe bearbeiten</h3>
+              <input
+                type="text"
+                placeholder="Aufgabentitel"
+                value={editingTask.title}
+                onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+              />
+              <select
+                value={editingTask.category}
+                onChange={(e) => setEditingTask({ ...editingTask, category: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+              >
+                <option value="">Kategorie wählen</option>
+                {categories.map(cat => (
+                  <option key={cat._id} value={cat._id}>{cat.name}</option>
+                ))}
+              </select>
+              <input
+                type="datetime-local"
+                value={editingTask.deadline}
+                onChange={(e) => setEditingTask({ ...editingTask, deadline: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleEditTask}
+                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
+                >
+                  Speichern
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEditTask(false);
+                    setEditingTask(null);
+                  }}
+                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Aufgabenliste */}
         <div className="space-y-3">
           {filteredTasks.length === 0 ? (
             <div className="bg-white rounded-xl shadow-md p-12 text-center">
@@ -641,12 +804,20 @@ const HouseholdPlanner = () => {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => deleteTask(task._id)}
-                      className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openEditTask(task)}
+                        className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition-colors"
+                      >
+                        <Edit2 className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => deleteTask(task._id)}
+                        className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
