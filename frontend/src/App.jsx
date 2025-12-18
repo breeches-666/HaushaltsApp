@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home } from 'lucide-react';
 
 // Backend API URL - Für lokale Entwicklung
 const API_URL = 'http://localhost:3000/api';
@@ -16,17 +16,22 @@ const HouseholdPlanner = () => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const [households, setHouseholds] = useState([]);
+  const [selectedHousehold, setSelectedHousehold] = useState(null);
+  const [pendingInvites, setPendingInvites] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [categories, setCategories] = useState([]);
   const [showAddTask, setShowAddTask] = useState(false);
   const [showEditTask, setShowEditTask] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [newTask, setNewTask] = useState({ title: '', category: '', deadline: '' });
   const [newCategory, setNewCategory] = useState({ name: '', color: '#3b82f6' });
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showCompleted, setShowCompleted] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
 
   // Lade Token aus localStorage
   useEffect(() => {
@@ -36,26 +41,147 @@ const HouseholdPlanner = () => {
       setToken(savedToken);
       setCurrentUser(JSON.parse(savedUser));
       setShowLogin(false);
-      loadUserData(savedToken);
+      loadHouseholds(savedToken);
+      loadInvites(savedToken);
     }
   }, []);
 
-  // Lade Aufgaben und Kategorien
-  const loadUserData = async (authToken) => {
+  // Lade Haushalte
+  const loadHouseholds = async (authToken) => {
+    try {
+      const response = await fetch(`${API_URL}/households`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const data = await response.json();
+      setHouseholds(data);
+      
+      // Wähle ersten Haushalt automatisch
+      if (data.length > 0) {
+        const savedHouseholdId = localStorage.getItem('selectedHousehold');
+        const household = data.find(h => h._id === savedHouseholdId) || data[0];
+        setSelectedHousehold(household);
+        loadHouseholdData(household._id, authToken);
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden der Haushalte:', error);
+    }
+  };
+
+  // Lade Einladungen
+  const loadInvites = async (authToken) => {
+    try {
+      const response = await fetch(`${API_URL}/households/invites`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const data = await response.json();
+      setPendingInvites(data);
+    } catch (error) {
+      console.error('Fehler beim Laden der Einladungen:', error);
+    }
+  };
+
+  // Lade Haushaltsdaten
+  const loadHouseholdData = async (householdId, authToken) => {
     try {
       const [tasksData, categoriesData] = await Promise.all([
-        fetch(`${API_URL}/tasks`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
+        fetch(`${API_URL}/tasks?householdId=${householdId}`, {
+          headers: { 'Authorization': `Bearer ${authToken || token}` }
         }).then(r => r.json()),
-        fetch(`${API_URL}/categories`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
+        fetch(`${API_URL}/categories?householdId=${householdId}`, {
+          headers: { 'Authorization': `Bearer ${authToken || token}` }
         }).then(r => r.json())
       ]);
 
       setTasks(tasksData);
       setCategories(categoriesData);
+      localStorage.setItem('selectedHousehold', householdId);
     } catch (error) {
       console.error('Fehler beim Laden:', error);
+    }
+  };
+
+  // Haushalt wechseln
+  const switchHousehold = (household) => {
+    setSelectedHousehold(household);
+    loadHouseholdData(household._id, token);
+  };
+
+  // Einladung annehmen
+  const acceptInvite = async (householdId) => {
+    try {
+      await fetch(`${API_URL}/households/${householdId}/accept`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      await loadHouseholds(token);
+      await loadInvites(token);
+      alert('Einladung angenommen!');
+    } catch (error) {
+      alert('Fehler beim Annehmen der Einladung');
+    }
+  };
+
+  // Einladung ablehnen
+  const declineInvite = async (householdId) => {
+    try {
+      await fetch(`${API_URL}/households/${householdId}/decline`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      await loadInvites(token);
+      alert('Einladung abgelehnt');
+    } catch (error) {
+      alert('Fehler beim Ablehnen der Einladung');
+    }
+  };
+
+  // Benutzer einladen
+  const handleInvite = async () => {
+    if (!inviteEmail) {
+      alert('Bitte E-Mail-Adresse eingeben!');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/households/${selectedHousehold._id}/invite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ email: inviteEmail })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error);
+      }
+
+      alert('Einladung versendet!');
+      setInviteEmail('');
+      setShowInviteModal(false);
+      await loadHouseholds(token);
+    } catch (error) {
+      alert(error.message || 'Fehler beim Versenden der Einladung');
+    }
+  };
+
+  // Mitglied entfernen
+  const removeMember = async (userId) => {
+    if (!confirm('Möchtest du dieses Mitglied wirklich entfernen?')) return;
+
+    try {
+      await fetch(`${API_URL}/households/${selectedHousehold._id}/members/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      await loadHouseholds(token);
+      alert('Mitglied entfernt');
+    } catch (error) {
+      alert('Fehler beim Entfernen des Mitglieds');
     }
   };
 
@@ -125,7 +251,8 @@ const HouseholdPlanner = () => {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setShowLogin(false);
-      await loadUserData(data.token);
+      await loadHouseholds(data.token);
+      await loadInvites(data.token);
       await requestNotificationPermission();
     } catch (error) {
       alert(error.message || 'Login fehlgeschlagen');
@@ -164,7 +291,8 @@ const HouseholdPlanner = () => {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setShowLogin(false);
-      await loadUserData(data.token);
+      await loadHouseholds(data.token);
+      await loadInvites(data.token);
       await requestNotificationPermission();
     } catch (error) {
       alert(error.message || 'Registrierung fehlgeschlagen');
@@ -177,11 +305,51 @@ const HouseholdPlanner = () => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('selectedHousehold');
     setToken(null);
     setCurrentUser(null);
     setShowLogin(true);
     setTasks([]);
     setCategories([]);
+    setHouseholds([]);
+  };
+
+  // Hilfsfunktion: datetime-local zu UTC ohne Zeitverschiebung
+  const localToUTC = (datetimeLocal) => {
+    if (!datetimeLocal) return null;
+    // Splitte "2024-12-19T09:00" in Komponenten
+    const [date, time] = datetimeLocal.split('T');
+    const [year, month, day] = date.split('-');
+    const [hours, minutes] = time.split(':');
+    // Erstelle UTC Date OHNE Zeitverschiebung
+    const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
+    return utcDate.toISOString();
+  };
+
+  // Hilfsfunktion: UTC zu datetime-local ohne Zeitverschiebung
+  const utcToLocal = (isoString) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    // Extrahiere UTC Komponenten (NICHT lokale!)
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  // Hilfsfunktion: Formatiere Datum für Anzeige ohne Zeitverschiebung
+  const formatDate = (isoString) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    // Nutze UTC Komponenten für Anzeige
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const year = date.getUTCFullYear();
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    return `${day}.${month}.${year} ${hours}:${minutes}`;
   };
 
   // Aufgabe hinzufügen
@@ -192,13 +360,20 @@ const HouseholdPlanner = () => {
     }
 
     try {
+      const taskData = {
+        title: newTask.title,
+        category: newTask.category,
+        householdId: selectedHousehold._id,
+        deadline: localToUTC(newTask.deadline)
+      };
+
       const response = await fetch(`${API_URL}/tasks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(newTask),
+        body: JSON.stringify(taskData),
       });
 
       if (!response.ok) throw new Error('Fehler beim Erstellen');
@@ -216,7 +391,7 @@ const HouseholdPlanner = () => {
   const openEditTask = (task) => {
     setEditingTask({
       ...task,
-      deadline: task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : ''
+      deadline: utcToLocal(task.deadline)
     });
     setShowEditTask(true);
   };
@@ -229,17 +404,19 @@ const HouseholdPlanner = () => {
     }
 
     try {
+      const updates = {
+        title: editingTask.title,
+        category: editingTask.category,
+        deadline: localToUTC(editingTask.deadline)
+      };
+
       const response = await fetch(`${API_URL}/tasks/${editingTask._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          title: editingTask.title,
-          category: editingTask.category,
-          deadline: editingTask.deadline
-        }),
+        body: JSON.stringify(updates),
       });
 
       if (!response.ok) throw new Error('Fehler beim Aktualisieren');
@@ -311,7 +488,10 @@ const HouseholdPlanner = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(newCategory),
+        body: JSON.stringify({
+          ...newCategory,
+          householdId: selectedHousehold._id
+        }),
       });
 
       if (!response.ok) throw new Error('Fehler beim Erstellen');
@@ -373,11 +553,9 @@ const HouseholdPlanner = () => {
     const statusA = getDeadlineStatus(a.deadline);
     const statusB = getDeadlineStatus(b.deadline);
 
-    // Überfällige Aufgaben zuerst
     if (statusA === 'overdue' && statusB !== 'overdue') return -1;
     if (statusA !== 'overdue' && statusB === 'overdue') return 1;
 
-    // Dann nach Deadline sortieren
     if (a.deadline && b.deadline) {
       return new Date(a.deadline) - new Date(b.deadline);
     }
@@ -386,6 +564,13 @@ const HouseholdPlanner = () => {
 
     return 0;
   });
+
+  // Hilfsfunktion: Name des Benutzers der Aufgabe erledigt hat
+  const getCompletedByName = (userId) => {
+    if (!selectedHousehold) return '';
+    const member = selectedHousehold.memberDetails?.find(m => m._id === userId);
+    return member ? member.name : 'Unbekannt';
+  };
 
   if (showLogin) {
     return (
@@ -476,35 +661,104 @@ const HouseholdPlanner = () => {
     );
   }
 
+  if (!selectedHousehold) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-gray-600">Lade Haushalt...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="bg-white shadow-md">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <Calendar className="w-6 h-6 text-indigo-600" />
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <Calendar className="w-6 h-6 text-indigo-600" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-800">{selectedHousehold.name}</h1>
+                <p className="text-sm text-gray-600">Hallo, {currentUser?.name}!</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-800">Haushaltsplaner</h1>
-              <p className="text-sm text-gray-600">Hallo, {currentUser?.name}!</p>
+            <div className="flex items-center gap-2">
+              {pendingInvites.length > 0 && (
+                <div className="relative">
+                  <Mail className="w-6 h-6 text-indigo-600" />
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {pendingInvites.length}
+                  </span>
+                </div>
+              )}
+              <button
+                onClick={() => setShowSettings(true)}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                <Settings className="w-5 h-5" />
+                <span className="hidden sm:inline">Einstellungen</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                <LogOut className="w-5 h-5" />
+                <span className="hidden sm:inline">Abmelden</span>
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowSettings(true)}
-              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              <Settings className="w-5 h-5" />
-              <span className="hidden sm:inline">Einstellungen</span>
-            </button>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              <LogOut className="w-5 h-5" />
-              <span className="hidden sm:inline">Abmelden</span>
-            </button>
-          </div>
+
+          {/* Haushalt-Wechsler */}
+          {households.length > 1 && (
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+              {households.map(h => (
+                <button
+                  key={h._id}
+                  onClick={() => switchHousehold(h)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
+                    selectedHousehold._id === h._id
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  <Home className="w-4 h-4" />
+                  {h.name}
+                  <span className="text-xs opacity-75">({h.members.length})</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Einladungsbenachrichtigungen */}
+          {pendingInvites.length > 0 && (
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="font-semibold text-blue-800 mb-2">
+                📨 Du hast {pendingInvites.length} neue Einladung(en)
+              </p>
+              {pendingInvites.map(invite => (
+                <div key={invite.householdId} className="flex items-center justify-between bg-white rounded p-3 mb-2">
+                  <span className="text-gray-800">{invite.householdName}</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => acceptInvite(invite.householdId)}
+                      className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                    >
+                      Annehmen
+                    </button>
+                    <button
+                      onClick={() => declineInvite(invite.householdId)}
+                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                    >
+                      Ablehnen
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -554,8 +808,8 @@ const HouseholdPlanner = () => {
 
         {/* Einstellungen Modal */}
         {showSettings && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-xl p-6 w-full max-w-2xl my-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold text-gray-800">Einstellungen</h3>
                 <button
@@ -566,7 +820,65 @@ const HouseholdPlanner = () => {
                 </button>
               </div>
 
+              {/* Haushaltsmitglieder */}
               <div className="mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Mitglieder ({selectedHousehold.members.length})
+                  </h4>
+                  <button
+                    onClick={() => setShowInviteModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    <Mail className="w-4 h-4" />
+                    Einladen
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {selectedHousehold.memberDetails?.map(member => (
+                    <div
+                      key={member._id}
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
+                      <div>
+                        <p className="font-medium text-gray-800">{member.name}</p>
+                        <p className="text-sm text-gray-500">{member.email}</p>
+                        {member._id === selectedHousehold.createdBy && (
+                          <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded mt-1 inline-block">
+                            Ersteller
+                          </span>
+                        )}
+                      </div>
+                      {member._id !== selectedHousehold.createdBy && (
+                        <button
+                          onClick={() => removeMember(member._id)}
+                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Ausstehende Einladungen */}
+                {selectedHousehold.invites?.filter(inv => inv.status === 'pending').length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Ausstehende Einladungen:</p>
+                    {selectedHousehold.invites
+                      .filter(inv => inv.status === 'pending')
+                      .map((inv, idx) => (
+                        <div key={idx} className="text-sm text-gray-500 bg-yellow-50 p-2 rounded mb-1">
+                          📧 {inv.email} - Eingeladen am {new Date(inv.invitedAt).toLocaleDateString('de-DE')}
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t pt-6 mb-6">
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="text-lg font-semibold text-gray-800">Kategorien verwalten</h4>
                   <button
@@ -615,6 +927,42 @@ const HouseholdPlanner = () => {
                   <p className="text-gray-600"><strong>Name:</strong> {currentUser?.name}</p>
                   <p className="text-gray-600"><strong>E-Mail:</strong> {currentUser?.email}</p>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Einladungs-Modal */}
+        {showInviteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Benutzer einladen</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Gib die E-Mail-Adresse des Benutzers ein, den du zu "{selectedHousehold.name}" einladen möchtest.
+              </p>
+              <input
+                type="email"
+                placeholder="E-Mail-Adresse"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleInvite}
+                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
+                >
+                  Einladen
+                </button>
+                <button
+                  onClick={() => {
+                    setShowInviteModal(false);
+                    setInviteEmail('');
+                  }}
+                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                >
+                  Abbrechen
+                </button>
               </div>
             </div>
           </div>
@@ -826,13 +1174,7 @@ const HouseholdPlanner = () => {
                                   deadlineStatus === 'overdue' ? 'text-red-500 font-bold' :
                                   deadlineStatus === 'soon' ? 'text-orange-500 font-medium' : 'text-gray-600'
                                 }>
-                                  {new Date(task.deadline).toLocaleString('de-DE', {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
+                                  {formatDate(task.deadline)}
                                   {isOverdue && ' - ÜBERFÄLLIG!'}
                                 </span>
                               </div>
@@ -910,17 +1252,17 @@ const HouseholdPlanner = () => {
                                   {category.name}
                                 </span>
                               )}
+                              {task.completedAt && (
+                                <span className="text-xs text-gray-600">
+                                  ✅ Erledigt am {formatDate(task.completedAt)}
+                                  {task.completedBy && ` von ${getCompletedByName(task.completedBy)}`}
+                                </span>
+                              )}
                               {task.deadline && (
                                 <div className="flex items-center gap-1 text-xs text-gray-600">
                                   <Bell className="w-3 h-3" />
                                   <span>
-                                    {new Date(task.deadline).toLocaleString('de-DE', {
-                                      day: '2-digit',
-                                      month: '2-digit',
-                                      year: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
+                                    Frist: {formatDate(task.deadline)}
                                   </span>
                                 </div>
                               )}
