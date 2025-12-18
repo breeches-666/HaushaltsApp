@@ -23,3 +23,8 @@ Thumbs.db
 # Logs
 logs/
 *.log
+# Füge zu .gitignore hinzu:
+frontend/android/
+frontend/ios/
+*.apk
+*.aab

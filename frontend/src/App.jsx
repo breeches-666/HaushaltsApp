@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home } from 'lucide-react';
 
 // Backend API URL - Für lokale Entwicklung
-const API_URL = 'http://localhost:3000/api';
+// frontend/src/App.jsx - Zeile 7
+const API_URL = 'http://deine-vps-ip:3000/api';
 
 const HouseholdPlanner = () => {
   const [currentUser, setCurrentUser] = useState(null);
