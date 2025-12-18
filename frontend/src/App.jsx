@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2 } from 'lucide-react';
+import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
 // Backend API URL - Für lokale Entwicklung
 const API_URL = 'http://localhost:3000/api';
@@ -26,6 +26,7 @@ const HouseholdPlanner = () => {
   const [newTask, setNewTask] = useState({ title: '', category: '', deadline: '' });
   const [newCategory, setNewCategory] = useState({ name: '', color: '#3b82f6' });
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showCompleted, setShowCompleted] = useState(false);
 
   // Lade Token aus localStorage
   useEffect(() => {
@@ -345,11 +346,6 @@ const HouseholdPlanner = () => {
     }
   };
 
-  // Gefilterte Aufgaben
-  const filteredTasks = selectedCategory === 'all' 
-    ? tasks 
-    : tasks.filter(task => task.category === selectedCategory);
-
   // Deadline-Status
   const getDeadlineStatus = (deadline) => {
     if (!deadline) return null;
@@ -362,6 +358,34 @@ const HouseholdPlanner = () => {
     if (diff <= oneHour) return 'soon';
     return 'ok';
   };
+
+  // Gefilterte und sortierte Aufgaben
+  const filteredTasks = selectedCategory === 'all' 
+    ? tasks 
+    : tasks.filter(task => task.category === selectedCategory);
+
+  // Trenne aktive und erledigte Aufgaben
+  const activeTasks = filteredTasks.filter(task => !task.completed);
+  const completedTasks = filteredTasks.filter(task => task.completed);
+
+  // Sortiere aktive Aufgaben: Überfällig zuerst, dann nach Deadline
+  const sortedActiveTasks = [...activeTasks].sort((a, b) => {
+    const statusA = getDeadlineStatus(a.deadline);
+    const statusB = getDeadlineStatus(b.deadline);
+
+    // Überfällige Aufgaben zuerst
+    if (statusA === 'overdue' && statusB !== 'overdue') return -1;
+    if (statusA !== 'overdue' && statusB === 'overdue') return 1;
+
+    // Dann nach Deadline sortieren
+    if (a.deadline && b.deadline) {
+      return new Date(a.deadline) - new Date(b.deadline);
+    }
+    if (a.deadline && !b.deadline) return -1;
+    if (!a.deadline && b.deadline) return 1;
+
+    return 0;
+  });
 
   if (showLogin) {
     return (
@@ -737,91 +761,193 @@ const HouseholdPlanner = () => {
         )}
 
         {/* Aufgabenliste */}
-        <div className="space-y-3">
-          {filteredTasks.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-md p-12 text-center">
-              <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 text-lg">Keine Aufgaben vorhanden</p>
-              <p className="text-gray-400 text-sm mt-2">Füge deine erste Aufgabe hinzu!</p>
-            </div>
-          ) : (
-            filteredTasks.map(task => {
-              const category = categories.find(cat => cat._id === task.category);
-              const deadlineStatus = getDeadlineStatus(task.deadline);
-              
-              return (
-                <div
-                  key={task._id}
-                  className={`bg-white rounded-xl shadow-md p-4 transition-all ${
-                    task.completed ? 'opacity-60' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <button
-                      onClick={() => toggleTask(task)}
-                      className={`mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
-                        task.completed
-                          ? 'bg-green-500 border-green-500'
-                          : 'border-gray-300 hover:border-green-500'
+        <div className="space-y-6">
+          {/* Aktive Aufgaben */}
+          <div>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              Aktive Aufgaben ({activeTasks.length})
+            </h2>
+            {sortedActiveTasks.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-md p-12 text-center">
+                <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 text-lg">Keine aktiven Aufgaben</p>
+                <p className="text-gray-400 text-sm mt-2">Gut gemacht! 🎉</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sortedActiveTasks.map(task => {
+                  const category = categories.find(cat => cat._id === task.category);
+                  const deadlineStatus = getDeadlineStatus(task.deadline);
+                  const isOverdue = deadlineStatus === 'overdue';
+                  
+                  return (
+                    <div
+                      key={task._id}
+                      className={`bg-white rounded-xl shadow-md p-4 transition-all ${
+                        isOverdue ? 'border-2 border-red-500 bg-red-50' : ''
                       }`}
                     >
-                      {task.completed && <Check className="w-4 h-4 text-white" />}
-                    </button>
+                      <div className="flex items-start gap-3">
+                        {isOverdue && (
+                          <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-1 animate-pulse" />
+                        )}
+                        
+                        <button
+                          onClick={() => toggleTask(task)}
+                          className={`mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                            task.completed
+                              ? 'bg-green-500 border-green-500'
+                              : 'border-gray-300 hover:border-green-500'
+                          }`}
+                        >
+                          {task.completed && <Check className="w-4 h-4 text-white" />}
+                        </button>
 
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-medium text-gray-800 ${task.completed ? 'line-through' : ''}`}>
-                        {task.title}
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-2 mt-2">
-                        {category && (
-                          <span
-                            className="px-3 py-1 rounded-full text-xs font-medium text-white"
-                            style={{ backgroundColor: category.color }}
-                          >
-                            {category.name}
-                          </span>
-                        )}
-                        {task.deadline && (
-                          <div className="flex items-center gap-1 text-xs text-gray-600">
-                            <Bell className={`w-3 h-3 ${
-                              deadlineStatus === 'overdue' ? 'text-red-500' :
-                              deadlineStatus === 'soon' ? 'text-orange-500' : ''
-                            }`} />
-                            <span className={
-                              deadlineStatus === 'overdue' ? 'text-red-500 font-medium' :
-                              deadlineStatus === 'soon' ? 'text-orange-500 font-medium' : ''
-                            }>
-                              {new Date(task.deadline).toLocaleString('de-DE', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
+                        <div className="flex-1 min-w-0">
+                          <h3 className={`font-medium ${isOverdue ? 'text-red-700 font-bold' : 'text-gray-800'}`}>
+                            {task.title}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            {category && (
+                              <span
+                                className="px-3 py-1 rounded-full text-xs font-medium text-white"
+                                style={{ backgroundColor: category.color }}
+                              >
+                                {category.name}
+                              </span>
+                            )}
+                            {task.deadline && (
+                              <div className="flex items-center gap-1 text-xs">
+                                <Bell className={`w-3 h-3 ${
+                                  deadlineStatus === 'overdue' ? 'text-red-500' :
+                                  deadlineStatus === 'soon' ? 'text-orange-500' : 'text-gray-600'
+                                }`} />
+                                <span className={
+                                  deadlineStatus === 'overdue' ? 'text-red-500 font-bold' :
+                                  deadlineStatus === 'soon' ? 'text-orange-500 font-medium' : 'text-gray-600'
+                                }>
+                                  {new Date(task.deadline).toLocaleString('de-DE', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                  {isOverdue && ' - ÜBERFÄLLIG!'}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => openEditTask(task)}
+                            className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition-colors"
+                          >
+                            <Edit2 className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => deleteTask(task._id)}
+                            className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => openEditTask(task)}
-                        className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition-colors"
+          {/* Erledigte Aufgaben */}
+          {completedTasks.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowCompleted(!showCompleted)}
+                className="flex items-center justify-between w-full text-left mb-4 p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow"
+              >
+                <h2 className="text-xl font-bold text-gray-800">
+                  Erledigte Aufgaben ({completedTasks.length})
+                </h2>
+                {showCompleted ? (
+                  <ChevronUp className="w-6 h-6 text-gray-600" />
+                ) : (
+                  <ChevronDown className="w-6 h-6 text-gray-600" />
+                )}
+              </button>
+
+              {showCompleted && (
+                <div className="space-y-3">
+                  {completedTasks.map(task => {
+                    const category = categories.find(cat => cat._id === task.category);
+                    
+                    return (
+                      <div
+                        key={task._id}
+                        className="bg-white rounded-xl shadow-md p-4 opacity-70 hover:opacity-100 transition-opacity"
                       >
-                        <Edit2 className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => deleteTask(task._id)}
-                        className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
+                        <div className="flex items-start gap-3">
+                          <button
+                            onClick={() => toggleTask(task)}
+                            className="mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 bg-green-500 border-green-500 flex items-center justify-center transition-colors"
+                          >
+                            <Check className="w-4 h-4 text-white" />
+                          </button>
+
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-gray-800 line-through">
+                              {task.title}
+                            </h3>
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                              {category && (
+                                <span
+                                  className="px-3 py-1 rounded-full text-xs font-medium text-white"
+                                  style={{ backgroundColor: category.color }}
+                                >
+                                  {category.name}
+                                </span>
+                              )}
+                              {task.deadline && (
+                                <div className="flex items-center gap-1 text-xs text-gray-600">
+                                  <Bell className="w-3 h-3" />
+                                  <span>
+                                    {new Date(task.deadline).toLocaleString('de-DE', {
+                                      day: '2-digit',
+                                      month: '2-digit',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openEditTask(task)}
+                              className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition-colors"
+                            >
+                              <Edit2 className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => deleteTask(task._id)}
+                              className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })
+              )}
+            </div>
           )}
         </div>
       </div>
