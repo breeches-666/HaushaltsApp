@@ -3,7 +3,7 @@ import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Setti
 
 // Backend API URL - Für lokale Entwicklung
 // frontend/src/App.jsx - Zeile 7
-const API_URL = 'http://deine-vps-ip:3000/api';
+const API_URL = 'https://backend.app.mr-dk.de/api';
 
 const HouseholdPlanner = () => {
   const [currentUser, setCurrentUser] = useState(null);
