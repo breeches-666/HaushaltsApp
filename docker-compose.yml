@@ -17,7 +17,7 @@ services:
       - haushaltsplaner-network
 
   mongo:
-    image: mongo:7
+    image: mongo:4.4
     ports:
       - "27017:27017"
     volumes:

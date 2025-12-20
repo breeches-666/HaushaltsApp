@@ -24,10 +24,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/haushaltsplaner', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/haushaltsplaner')
 .then(() => console.log('✅ MongoDB verbunden'))
 .catch(err => console.error('❌ MongoDB Fehler:', err));
 
