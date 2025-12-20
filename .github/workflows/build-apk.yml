@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, claude/deploy-backend-server-0TRwy ]
   workflow_dispatch:
 
 jobs:
@@ -10,29 +10,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 18
-          
+
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '17'
-          
-      - name: Build
+
+      - name: Install dependencies
         run: |
           cd frontend
           npm install
+
+      - name: Build frontend
+        run: |
+          cd frontend
           npm run build
+
+      - name: Initialize Capacitor Android (if needed)
+        run: |
+          cd frontend
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
           npx cap sync android
-          cd android
-          ./gradlew assembleDebug
-          
+
+      - name: Build APK
+        run: |
+          cd frontend/android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: haushaltsplaner-app-debug
           path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
