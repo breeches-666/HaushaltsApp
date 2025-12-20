@@ -8,10 +8,19 @@ require('dotenv').config();
 const app = express();
 
 // Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  credentials: true
-}));
+// CORS-Konfiguration - erlaubt alle Origins
+// Da wir JWT-Auth verwenden (nicht Cookie-basiert), brauchen wir keine credentials
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Erlaubt alle Origins
+    callback(null, true);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // MongoDB Connection
