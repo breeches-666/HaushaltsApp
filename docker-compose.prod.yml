@@ -25,7 +25,7 @@ services:
       start_period: 40s
 
   mongo:
-    image: mongo:7
+    image: mongo:4.4
     # Port nicht nach außen exponieren für Sicherheit
     # ports:
     #   - "27017:27017"

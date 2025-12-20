@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home } from 'lucide-react';
 
 // Backend API URL - Für lokale Entwicklung
-// frontend/src/App.jsx - Zeile 7
 const API_URL = 'https://backend.app.mr-dk.de/api';
 
-const HouseholdPlanner = () => {
+export default function HouseholdPlanner() {
   const [currentUser, setCurrentUser] = useState(null);
   const [token, setToken] = useState(null);
   const [showLogin, setShowLogin] = useState(true);
@@ -105,6 +104,32 @@ const HouseholdPlanner = () => {
   const switchHousehold = (household) => {
     setSelectedHousehold(household);
     loadHouseholdData(household._id, token);
+  };
+
+  // Gemeinsamen Haushalt erstellen
+  const createSharedHousehold = async () => {
+    const name = prompt('Name des gemeinsamen Haushalts:');
+    if (!name || !name.trim()) return;
+
+    try {
+      const response = await fetch(`${API_URL}/households`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name: name.trim(), isPrivate: false })
+      });
+
+      if (!response.ok) throw new Error('Fehler beim Erstellen');
+
+      const newHousehold = await response.json();
+      await loadHouseholds(token);
+      switchHousehold(newHousehold);
+      alert('Gemeinsamer Haushalt erstellt! Du kannst jetzt andere Personen einladen.');
+    } catch (error) {
+      alert('Fehler beim Erstellen des Haushalts');
+    }
   };
 
   // Einladung annehmen
@@ -696,6 +721,14 @@ const HouseholdPlanner = () => {
                 </div>
               )}
               <button
+                onClick={createSharedHousehold}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                title="Gemeinsamen Haushalt erstellen"
+              >
+                <FolderPlus className="w-5 h-5" />
+                <span className="hidden sm:inline">Gemeinsam</span>
+              </button>
+              <button
                 onClick={() => setShowSettings(true)}
                 className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
               >
@@ -727,7 +760,12 @@ const HouseholdPlanner = () => {
                 >
                   <Home className="w-4 h-4" />
                   {h.name}
-                  <span className="text-xs opacity-75">({h.members.length})</span>
+                  {h.isPrivate && (
+                    <span className="text-xs opacity-75">🔒</span>
+                  )}
+                  {!h.isPrivate && (
+                    <span className="text-xs opacity-75">({h.members.length})</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -809,8 +847,8 @@ const HouseholdPlanner = () => {
 
         {/* Einstellungen Modal */}
         {showSettings && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl p-6 w-full max-w-2xl my-8">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-8">
+            <div className="bg-white rounded-xl p-6 w-full max-w-2xl my-4 sm:my-8 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold text-gray-800">Einstellungen</h3>
                 <button
@@ -826,16 +864,26 @@ const HouseholdPlanner = () => {
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                     <Users className="w-5 h-5" />
-                    Mitglieder ({selectedHousehold.members.length})
+                    {selectedHousehold.isPrivate ? 'Privater Haushalt 🔒' : `Mitglieder (${selectedHousehold.members.length})`}
                   </h4>
-                  <button
-                    onClick={() => setShowInviteModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                  >
-                    <Mail className="w-4 h-4" />
-                    Einladen
-                  </button>
+                  {!selectedHousehold.isPrivate && (
+                    <button
+                      onClick={() => setShowInviteModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                    >
+                      <Mail className="w-4 h-4" />
+                      Einladen
+                    </button>
+                  )}
                 </div>
+
+                {selectedHousehold.isPrivate && (
+                  <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <p className="text-sm text-yellow-800">
+                      <strong>Privater Haushalt:</strong> Dieser Haushalt ist nur für dich. Um Aufgaben mit anderen zu teilen, erstelle einen gemeinsamen Haushalt über den grünen "Gemeinsam"-Button oben.
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   {selectedHousehold.memberDetails?.map(member => (
@@ -935,8 +983,8 @@ const HouseholdPlanner = () => {
 
         {/* Einladungs-Modal */}
         {showInviteModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Benutzer einladen</h3>
               <p className="text-gray-600 text-sm mb-4">
                 Gib die E-Mail-Adresse des Benutzers ein, den du zu "{selectedHousehold.name}" einladen möchtest.
@@ -971,8 +1019,8 @@ const HouseholdPlanner = () => {
 
         {/* Neue Kategorie Modal */}
         {showAddCategory && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Neue Kategorie</h3>
               <input
                 type="text"
@@ -1013,8 +1061,8 @@ const HouseholdPlanner = () => {
 
         {/* Neue Aufgabe Modal */}
         {showAddTask && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Neue Aufgabe</h3>
               <input
                 type="text"
@@ -1062,8 +1110,8 @@ const HouseholdPlanner = () => {
 
         {/* Aufgabe bearbeiten Modal */}
         {showEditTask && editingTask && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Aufgabe bearbeiten</h3>
               <input
                 type="text"
@@ -1296,6 +1344,4 @@ const HouseholdPlanner = () => {
       </div>
     </div>
   );
-};
-
-export default HouseholdPlanner;
+}

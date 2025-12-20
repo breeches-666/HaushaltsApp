@@ -8,17 +8,23 @@ require('dotenv').config();
 const app = express();
 
 // Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  credentials: true
-}));
+// CORS-Konfiguration - erlaubt alle Origins
+// Da wir JWT-Auth verwenden (nicht Cookie-basiert), brauchen wir keine credentials
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Erlaubt alle Origins
+    callback(null, true);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/haushaltsplaner', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/haushaltsplaner')
 .then(() => console.log('✅ MongoDB verbunden'))
 .catch(err => console.error('❌ MongoDB Fehler:', err));
 
@@ -34,6 +40,7 @@ const HouseholdSchema = new mongoose.Schema({
   name: { type: String, required: true },
   members: [{ type: String, required: true }], // User IDs
   createdBy: { type: String, required: true },
+  isPrivate: { type: Boolean, default: false }, // Private Haushalte können nicht geteilt werden
   invites: [{
     email: String,
     status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
@@ -100,11 +107,12 @@ app.post('/api/register', async (req, res) => {
     });
     await user.save();
 
-    // Erstelle Standard-Haushalt für neuen Benutzer
+    // Erstelle privaten Haushalt für neuen Benutzer
     const household = new Household({
-      name: `${name}s Haushalt`,
+      name: `Mein privater Haushalt`,
       members: [user._id.toString()],
-      createdBy: user._id.toString()
+      createdBy: user._id.toString(),
+      isPrivate: true // Privater Haushalt, kann nicht geteilt werden
     });
     await household.save();
 
@@ -199,12 +207,13 @@ app.get('/api/households', authenticateToken, async (req, res) => {
 
 app.post('/api/households', authenticateToken, async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, isPrivate = false } = req.body;
 
     const household = new Household({
       name,
       members: [req.user.id],
-      createdBy: req.user.id
+      createdBy: req.user.id,
+      isPrivate // Gemeinsame Haushalte haben isPrivate: false
     });
     await household.save();
 
@@ -229,6 +238,10 @@ app.post('/api/households/:id/invite', authenticateToken, async (req, res) => {
 
     if (!household) {
       return res.status(404).json({ error: 'Haushalt nicht gefunden' });
+    }
+
+    if (household.isPrivate) {
+      return res.status(400).json({ error: 'Private Haushalte können nicht geteilt werden' });
     }
 
     if (!household.members.includes(req.user.id)) {
