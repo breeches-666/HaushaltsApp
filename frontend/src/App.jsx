@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home } from 'lucide-react';
 
 // Backend API URL - Für lokale Entwicklung
-// frontend/src/App.jsx - Zeile 7
 const API_URL = 'https://backend.app.mr-dk.de/api';
 
-const HouseholdPlanner = () => {
+export default function HouseholdPlanner() {
   const [currentUser, setCurrentUser] = useState(null);
   const [token, setToken] = useState(null);
   const [showLogin, setShowLogin] = useState(true);
@@ -1296,6 +1295,4 @@ const HouseholdPlanner = () => {
       </div>
     </div>
   );
-};
-
-export default HouseholdPlanner;
+}
