@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home, RefreshCw } from 'lucide-react';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 
 // Backend API URL - Für lokale Entwicklung
 const API_URL = 'https://backend.app.mr-dk.de/api';
@@ -47,6 +49,88 @@ export default function HouseholdPlanner() {
       loadInvites(savedToken);
     }
   }, []);
+
+  // Push Notifications Setup
+  useEffect(() => {
+    const initPushNotifications = async () => {
+      // Nur auf nativen Plattformen (Android/iOS)
+      if (!Capacitor.isNativePlatform()) {
+        console.log('Push Notifications nur auf nativen Plattformen verfügbar');
+        return;
+      }
+
+      if (!token) {
+        return; // Warte bis User eingeloggt ist
+      }
+
+      try {
+        // Prüfe Permission Status
+        let permStatus = await PushNotifications.checkPermissions();
+
+        if (permStatus.receive === 'prompt') {
+          // Frage nach Permission
+          permStatus = await PushNotifications.requestPermissions();
+        }
+
+        if (permStatus.receive !== 'granted') {
+          console.log('Push Notification Permission verweigert');
+          return;
+        }
+
+        // Registriere für Push Notifications
+        await PushNotifications.register();
+
+        // Listener für erfolgreiche Registrierung
+        await PushNotifications.addListener('registration', async (tokenData) => {
+          console.log('✅ FCM Token erhalten:', tokenData.value);
+
+          // Sende Token an Backend
+          try {
+            await fetch(`${API_URL}/user/fcm-token`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ fcmToken: tokenData.value })
+            });
+            console.log('✅ FCM Token an Backend gesendet');
+          } catch (error) {
+            console.error('❌ Fehler beim Senden des FCM Tokens:', error);
+          }
+        });
+
+        // Listener für Registrierungs-Fehler
+        await PushNotifications.addListener('registrationError', (error) => {
+          console.error('❌ Push Notification Registrierung fehlgeschlagen:', error);
+        });
+
+        // Listener für empfangene Notifications (App im Vordergrund)
+        await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          console.log('📬 Push Notification empfangen:', notification);
+          // Zeige Notification im Frontend (optional)
+        });
+
+        // Listener für geklickte Notifications
+        await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+          console.log('🔔 Notification geklickt:', notification);
+          // Navigation basierend auf notification.data möglich
+        });
+
+      } catch (error) {
+        console.error('❌ Push Notification Setup fehlgeschlagen:', error);
+      }
+    };
+
+    initPushNotifications();
+
+    // Cleanup
+    return () => {
+      if (Capacitor.isNativePlatform()) {
+        PushNotifications.removeAllListeners();
+      }
+    };
+  }, [token]);
 
   // Lade Haushalte
   const loadHouseholds = async (authToken) => {
@@ -243,6 +327,47 @@ export default function HouseholdPlanner() {
       alert('Mitglied entfernt');
     } catch (error) {
       alert('Fehler beim Entfernen des Mitglieds');
+    }
+  };
+
+  // Haushalt löschen
+  const deleteHousehold = async () => {
+    if (!confirm(`Möchtest du den Haushalt "${selectedHousehold.name}" wirklich dauerhaft löschen? Alle Aufgaben und Kategorien werden ebenfalls gelöscht. Dies kann nicht rückgängig gemacht werden!`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/households/${selectedHousehold._id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        alert(data.error || 'Fehler beim Löschen des Haushalts');
+        return;
+      }
+
+      // Schließe Einstellungen
+      setShowSettings(false);
+
+      // Lade Haushalte neu
+      await loadHouseholds(token);
+
+      // Wähle ersten verfügbaren Haushalt aus
+      const updatedHouseholds = await fetch(`${API_URL}/households`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).then(r => r.json());
+
+      if (updatedHouseholds.length > 0) {
+        setSelectedHousehold(updatedHouseholds[0]);
+        await loadHouseholdData(updatedHouseholds[0]._id, token);
+      }
+
+      alert('Haushalt erfolgreich gelöscht');
+    } catch (error) {
+      console.error('Fehler beim Löschen:', error);
+      alert('Fehler beim Löschen des Haushalts');
     }
   };
 
@@ -1024,6 +1149,22 @@ export default function HouseholdPlanner() {
                           📧 {inv.email} - Eingeladen am {new Date(inv.invitedAt).toLocaleDateString('de-DE')}
                         </div>
                       ))}
+                  </div>
+                )}
+
+                {/* Haushalt löschen - nur für gemeinsame Haushalte */}
+                {!selectedHousehold.isPrivate && selectedHousehold.members.length === 1 && (
+                  <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-sm text-red-800 mb-3">
+                      <strong>Achtung:</strong> Du bist das einzige Mitglied in diesem Haushalt. Du kannst ihn jetzt löschen.
+                    </p>
+                    <button
+                      onClick={deleteHousehold}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Haushalt dauerhaft löschen
+                    </button>
                   </div>
                 )}
               </div>

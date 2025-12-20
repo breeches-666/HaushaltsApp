@@ -3,9 +3,28 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const admin = require('firebase-admin');
+const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
+
+// Firebase Admin SDK initialisieren
+// Wichtig: In Production muss FIREBASE_SERVICE_ACCOUNT als JSON string in .env gesetzt sein
+// Beispiel: FIREBASE_SERVICE_ACCOUNT='{"type":"service_account",...}'
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('✅ Firebase Admin SDK initialisiert');
+  } else {
+    console.warn('⚠️ FIREBASE_SERVICE_ACCOUNT nicht gefunden - Push Notifications deaktiviert');
+  }
+} catch (error) {
+  console.error('❌ Firebase Initialisierung fehlgeschlagen:', error.message);
+}
 
 // Middleware
 // CORS-Konfiguration - erlaubt alle Origins
@@ -33,6 +52,7 @@ const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  fcmToken: { type: String, default: null }, // Firebase Cloud Messaging Token für Push Notifications
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -87,6 +107,57 @@ const authenticateToken = (req, res, next) => {
     req.user = user;
     next();
   });
+};
+
+// Push Notification Hilfsfunktionen
+const sendPushNotification = async (userId, title, body, data = {}) => {
+  try {
+    // Prüfe ob Firebase initialisiert ist
+    if (!admin.apps.length) {
+      console.log('Push Notification übersprungen (Firebase nicht initialisiert)');
+      return false;
+    }
+
+    const user = await User.findById(userId);
+    if (!user || !user.fcmToken) {
+      console.log(`Push Notification übersprungen (kein FCM Token für User ${userId})`);
+      return false;
+    }
+
+    const message = {
+      notification: {
+        title,
+        body
+      },
+      data: {
+        ...data,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK'
+      },
+      token: user.fcmToken,
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'haushaltsapp_channel',
+          sound: 'default'
+        }
+      }
+    };
+
+    await admin.messaging().send(message);
+    console.log(`✅ Push Notification gesendet an User ${userId}: ${title}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Push Notification Fehler für User ${userId}:`, error.message);
+
+    // Wenn Token ungültig ist, lösche ihn
+    if (error.code === 'messaging/invalid-registration-token' ||
+        error.code === 'messaging/registration-token-not-registered') {
+      await User.findByIdAndUpdate(userId, { fcmToken: null });
+      console.log(`FCM Token für User ${userId} gelöscht (ungültig)`);
+    }
+
+    return false;
+  }
 };
 
 // Auth Routes
@@ -179,6 +250,25 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// FCM Token Registration
+app.post('/api/user/fcm-token', authenticateToken, async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+
+    if (!fcmToken) {
+      return res.status(400).json({ error: 'FCM Token erforderlich' });
+    }
+
+    await User.findByIdAndUpdate(req.user.id, { fcmToken });
+    console.log(`✅ FCM Token registriert für User ${req.user.id}`);
+
+    res.json({ message: 'FCM Token erfolgreich registriert' });
+  } catch (error) {
+    console.error('FCM Token Registrierung fehlgeschlagen:', error);
+    res.status(500).json({ error: 'FCM Token Registrierung fehlgeschlagen' });
+  }
+});
+
 // Household Routes
 app.get('/api/households', authenticateToken, async (req, res) => {
   try {
@@ -232,6 +322,50 @@ app.post('/api/households', authenticateToken, async (req, res) => {
   }
 });
 
+// Haushalt löschen (nur wenn User einziges Mitglied ist)
+app.delete('/api/households/:id', authenticateToken, async (req, res) => {
+  try {
+    const household = await Household.findById(req.params.id);
+
+    if (!household) {
+      return res.status(404).json({ error: 'Haushalt nicht gefunden' });
+    }
+
+    // Prüfe ob User Mitglied ist
+    if (!household.members.includes(req.user.id)) {
+      return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+
+    // Prüfe ob User einziges Mitglied ist
+    if (household.members.length > 1) {
+      return res.status(400).json({
+        error: 'Haushalt kann nur gelöscht werden, wenn du das einzige Mitglied bist. Aktuell sind noch ' + household.members.length + ' Mitglieder im Haushalt.'
+      });
+    }
+
+    // Private Haushalte dürfen nicht gelöscht werden (jeder Nutzer braucht mindestens einen)
+    if (household.isPrivate) {
+      return res.status(400).json({ error: 'Private Haushalte können nicht gelöscht werden' });
+    }
+
+    const householdId = household._id.toString();
+
+    // Lösche alle Tasks des Haushalts
+    await Task.deleteMany({ householdId });
+
+    // Lösche alle Kategorien des Haushalts
+    await Category.deleteMany({ householdId });
+
+    // Lösche den Haushalt
+    await Household.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Haushalt erfolgreich gelöscht' });
+  } catch (error) {
+    console.error('Fehler beim Löschen des Haushalts:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen des Haushalts' });
+  }
+});
+
 app.post('/api/households/:id/invite', authenticateToken, async (req, res) => {
   try {
     const { email } = req.body;
@@ -271,6 +405,15 @@ app.post('/api/households/:id/invite', authenticateToken, async (req, res) => {
       status: 'pending'
     });
     await household.save();
+
+    // Sende Push Notification an eingeladenen User
+    const inviter = await User.findById(req.user.id);
+    await sendPushNotification(
+      invitedUser._id,
+      'Neue Haushalt-Einladung',
+      `${inviter.name} hat dich zu "${household.name}" eingeladen`,
+      { type: 'invitation', householdId: household._id.toString() }
+    );
 
     res.json({ message: 'Einladung versendet', household });
   } catch (error) {
@@ -412,6 +555,32 @@ app.post('/api/tasks', authenticateToken, async (req, res) => {
       householdId
     });
     await task.save();
+
+    // Push Notifications senden
+    const creator = await User.findById(req.user.id);
+    const category = await Category.findById(task.category);
+
+    // 1. Benachrichtige alle anderen Mitglieder über neue Task
+    const otherMembers = household.members.filter(m => m !== req.user.id);
+    for (const memberId of otherMembers) {
+      await sendPushNotification(
+        memberId,
+        'Neue Aufgabe',
+        `${creator.name} hat "${task.title}" erstellt${category ? ` (${category.name})` : ''}`,
+        { type: 'new_task', taskId: task._id.toString(), householdId }
+      );
+    }
+
+    // 2. Zusätzlich: Wenn Task zugewiesen wurde (und nicht Selbstzuweisung)
+    if (task.assignedTo && task.assignedTo !== req.user.id) {
+      await sendPushNotification(
+        task.assignedTo,
+        'Dir wurde eine Aufgabe zugewiesen',
+        `${creator.name} hat dir "${task.title}" zugewiesen`,
+        { type: 'task_assigned', taskId: task._id.toString(), householdId }
+      );
+    }
+
     res.json(task);
   } catch (error) {
     res.status(500).json({ error: 'Fehler beim Erstellen der Aufgabe' });
@@ -429,6 +598,9 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Keine Berechtigung' });
     }
 
+    // Speichere alte Zuweisung für Notification-Vergleich
+    const oldAssignedTo = task.assignedTo;
+
     // Wenn completed sich ändert, setze completedAt
     if (req.body.completed !== undefined && req.body.completed !== task.completed) {
       if (req.body.completed) {
@@ -442,6 +614,20 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
 
     Object.assign(task, req.body);
     await task.save();
+
+    // Push Notification bei Zuweisung (nur wenn sich assignedTo geändert hat)
+    if (req.body.assignedTo !== undefined &&
+        req.body.assignedTo !== oldAssignedTo &&
+        req.body.assignedTo !== req.user.id) {
+      const assigner = await User.findById(req.user.id);
+      await sendPushNotification(
+        req.body.assignedTo,
+        'Dir wurde eine Aufgabe zugewiesen',
+        `${assigner.name} hat dir "${task.title}" zugewiesen`,
+        { type: 'task_assigned', taskId: task._id.toString(), householdId: task.householdId }
+      );
+    }
+
     res.json(task);
   } catch (error) {
     res.status(500).json({ error: 'Fehler beim Aktualisieren der Aufgabe' });
@@ -540,6 +726,82 @@ app.delete('/api/categories/:id', authenticateToken, async (req, res) => {
 // Health Check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
+});
+
+// Cron Job für Deadline-Benachrichtigungen (läuft alle 5 Minuten)
+cron.schedule('*/5 * * * *', async () => {
+  try {
+    console.log('⏰ Prüfe Deadline-Benachrichtigungen...');
+    const now = new Date();
+    const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+
+    // Finde alle nicht erledigten Tasks mit Deadline
+    const tasks = await Task.find({
+      completed: false,
+      deadline: { $exists: true, $ne: null }
+    });
+
+    for (const task of tasks) {
+      const deadline = new Date(task.deadline);
+
+      // 1. Prüfe ob Task überfällig ist (und noch nicht benachrichtigt)
+      if (deadline < now && !task.overdueNotified) {
+        const household = await Household.findById(task.householdId);
+        if (!household) continue;
+
+        const category = await Category.findById(task.category);
+
+        // Benachrichtige zugewiesene Person oder alle Mitglieder
+        const recipients = task.assignedTo
+          ? [task.assignedTo]
+          : household.members;
+
+        for (const memberId of recipients) {
+          await sendPushNotification(
+            memberId,
+            'Aufgabe überfällig!',
+            `"${task.title}" ist überfällig${category ? ` (${category.name})` : ''}`,
+            { type: 'overdue', taskId: task._id.toString(), householdId: task.householdId }
+          );
+        }
+
+        // Markiere als benachrichtigt
+        task.overdueNotified = true;
+        await task.save();
+        console.log(`📢 Überfällig-Benachrichtigung gesendet für Task: ${task.title}`);
+      }
+
+      // 2. Prüfe ob Task in den nächsten 60 Minuten fällig ist (und noch nicht benachrichtigt)
+      else if (deadline > now && deadline <= oneHourLater && !task.hourNotified) {
+        const household = await Household.findById(task.householdId);
+        if (!household) continue;
+
+        const category = await Category.findById(task.category);
+        const minutesUntilDeadline = Math.round((deadline - now) / 1000 / 60);
+
+        // Benachrichtige zugewiesene Person oder alle Mitglieder
+        const recipients = task.assignedTo
+          ? [task.assignedTo]
+          : household.members;
+
+        for (const memberId of recipients) {
+          await sendPushNotification(
+            memberId,
+            'Aufgabe bald fällig',
+            `"${task.title}" ist in ${minutesUntilDeadline} Minuten fällig${category ? ` (${category.name})` : ''}`,
+            { type: 'deadline_soon', taskId: task._id.toString(), householdId: task.householdId }
+          );
+        }
+
+        // Markiere als benachrichtigt
+        task.hourNotified = true;
+        await task.save();
+        console.log(`📢 60-Minuten-Warnung gesendet für Task: ${task.title}`);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Fehler bei Deadline-Benachrichtigungen:', error);
+  }
 });
 
 // Server starten
