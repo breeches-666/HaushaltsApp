@@ -94,6 +94,13 @@ export default function HouseholdPlanner() {
         }).then(r => r.json())
       ]);
 
+      console.log('📥 Geladene Tasks vom Backend:', tasksData.length, 'Tasks');
+      const tasksWithAssignment = tasksData.filter(t => t.assignedTo);
+      console.log('   - Tasks mit Zuweisung:', tasksWithAssignment.length);
+      if (tasksWithAssignment.length > 0) {
+        console.log('   - Beispiel:', tasksWithAssignment[0].title, '→', tasksWithAssignment[0].assignedTo);
+      }
+
       setTasks(tasksData);
       setCategories(categoriesData);
       localStorage.setItem('selectedHousehold', householdId);
@@ -419,6 +426,8 @@ export default function HouseholdPlanner() {
         assignedTo: newTask.assignedTo || null
       };
 
+      console.log('📤 Sende neue Task mit assignedTo:', taskData.assignedTo);
+
       const response = await fetch(`${API_URL}/tasks`, {
         method: 'POST',
         headers: {
@@ -431,6 +440,9 @@ export default function HouseholdPlanner() {
       if (!response.ok) throw new Error('Fehler beim Erstellen');
 
       const task = await response.json();
+      console.log('📥 Empfangene Task vom Backend:', task);
+      console.log('   - assignedTo:', task.assignedTo);
+
       setTasks([...tasks, task]);
       setNewTask({ title: '', category: '', deadline: '', assignedTo: '' });
       setShowAddTask(false);
@@ -463,6 +475,8 @@ export default function HouseholdPlanner() {
         assignedTo: editingTask.assignedTo || null
       };
 
+      console.log('📤 Update Task mit assignedTo:', updates.assignedTo);
+
       const response = await fetch(`${API_URL}/tasks/${editingTask._id}`, {
         method: 'PUT',
         headers: {
@@ -475,6 +489,9 @@ export default function HouseholdPlanner() {
       if (!response.ok) throw new Error('Fehler beim Aktualisieren');
 
       const updatedTask = await response.json();
+      console.log('📥 Empfangene aktualisierte Task:', updatedTask);
+      console.log('   - assignedTo:', updatedTask.assignedTo);
+
       setTasks(tasks.map(t => t._id === updatedTask._id ? updatedTask : t));
       setShowEditTask(false);
       setEditingTask(null);
