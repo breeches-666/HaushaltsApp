@@ -28,11 +28,12 @@ export default function HouseholdPlanner() {
   const [showSettings, setShowSettings] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
-  const [newTask, setNewTask] = useState({ title: '', category: '', deadline: '' });
+  const [newTask, setNewTask] = useState({ title: '', category: '', deadline: '', assignedTo: '' });
   const [newCategory, setNewCategory] = useState({ name: '', color: '#3b82f6' });
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showCompleted, setShowCompleted] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [assignmentFilter, setAssignmentFilter] = useState('all'); // 'all', 'mine', 'unassigned'
 
   // Lade Token aus localStorage
   useEffect(() => {
@@ -414,7 +415,8 @@ export default function HouseholdPlanner() {
         title: newTask.title,
         category: newTask.category,
         householdId: selectedHousehold._id,
-        deadline: localToUTC(newTask.deadline)
+        deadline: localToUTC(newTask.deadline),
+        assignedTo: newTask.assignedTo || null
       };
 
       const response = await fetch(`${API_URL}/tasks`, {
@@ -430,7 +432,7 @@ export default function HouseholdPlanner() {
 
       const task = await response.json();
       setTasks([...tasks, task]);
-      setNewTask({ title: '', category: '', deadline: '' });
+      setNewTask({ title: '', category: '', deadline: '', assignedTo: '' });
       setShowAddTask(false);
     } catch (error) {
       alert('Fehler beim Erstellen der Aufgabe');
@@ -457,7 +459,8 @@ export default function HouseholdPlanner() {
       const updates = {
         title: editingTask.title,
         category: editingTask.category,
-        deadline: localToUTC(editingTask.deadline)
+        deadline: localToUTC(editingTask.deadline),
+        assignedTo: editingTask.assignedTo || null
       };
 
       const response = await fetch(`${API_URL}/tasks/${editingTask._id}`, {
@@ -590,9 +593,16 @@ export default function HouseholdPlanner() {
   };
 
   // Gefilterte und sortierte Aufgaben
-  const filteredTasks = selectedCategory === 'all' 
-    ? tasks 
+  let filteredTasks = selectedCategory === 'all'
+    ? tasks
     : tasks.filter(task => task.category === selectedCategory);
+
+  // Filter nach Zuweisung
+  if (assignmentFilter === 'mine') {
+    filteredTasks = filteredTasks.filter(task => task.assignedTo === currentUser?.id);
+  } else if (assignmentFilter === 'unassigned') {
+    filteredTasks = filteredTasks.filter(task => !task.assignedTo);
+  }
 
   // Trenne aktive und erledigte Aufgaben
   const activeTasks = filteredTasks.filter(task => !task.completed);
@@ -872,6 +882,44 @@ export default function HouseholdPlanner() {
             ))}
           </div>
 
+          {selectedHousehold && !selectedHousehold.isPrivate && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Zuweisung</h3>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setAssignmentFilter('all')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    assignmentFilter === 'all'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Alle
+                </button>
+                <button
+                  onClick={() => setAssignmentFilter('mine')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    assignmentFilter === 'mine'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Meine Aufgaben
+                </button>
+                <button
+                  onClick={() => setAssignmentFilter('unassigned')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    assignmentFilter === 'unassigned'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Nicht zugewiesen
+                </button>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={() => setShowAddTask(true)}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
@@ -1123,6 +1171,18 @@ export default function HouseholdPlanner() {
                 onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
               />
+              {selectedHousehold && !selectedHousehold.isPrivate && (
+                <select
+                  value={newTask.assignedTo}
+                  onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                >
+                  <option value="">Nicht zugewiesen</option>
+                  {selectedHousehold.memberDetails?.map(member => (
+                    <option key={member._id} value={member._id}>{member.name} ({member.email})</option>
+                  ))}
+                </select>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={handleAddTask}
@@ -1133,7 +1193,7 @@ export default function HouseholdPlanner() {
                 <button
                   onClick={() => {
                     setShowAddTask(false);
-                    setNewTask({ title: '', category: '', deadline: '' });
+                    setNewTask({ title: '', category: '', deadline: '', assignedTo: '' });
                   }}
                   className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
                 >
@@ -1172,6 +1232,18 @@ export default function HouseholdPlanner() {
                 onChange={(e) => setEditingTask({ ...editingTask, deadline: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
               />
+              {selectedHousehold && !selectedHousehold.isPrivate && (
+                <select
+                  value={editingTask.assignedTo || ''}
+                  onChange={(e) => setEditingTask({ ...editingTask, assignedTo: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                >
+                  <option value="">Nicht zugewiesen</option>
+                  {selectedHousehold.memberDetails?.map(member => (
+                    <option key={member._id} value={member._id}>{member.name} ({member.email})</option>
+                  ))}
+                </select>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={handleEditTask}
@@ -1264,6 +1336,14 @@ export default function HouseholdPlanner() {
                                 </span>
                               </div>
                             )}
+                            {task.assignedTo && selectedHousehold?.memberDetails && (
+                              <div className="flex items-center gap-1 text-xs text-indigo-600">
+                                <User className="w-3 h-3" />
+                                <span>
+                                  {selectedHousehold.memberDetails.find(m => m._id === task.assignedTo)?.name || 'Unbekannt'}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -1348,6 +1428,14 @@ export default function HouseholdPlanner() {
                                   <Bell className="w-3 h-3" />
                                   <span>
                                     Frist: {formatDate(task.deadline)}
+                                  </span>
+                                </div>
+                              )}
+                              {task.assignedTo && selectedHousehold?.memberDetails && (
+                                <div className="flex items-center gap-1 text-xs text-indigo-600">
+                                  <User className="w-3 h-3" />
+                                  <span>
+                                    {selectedHousehold.memberDetails.find(m => m._id === task.assignedTo)?.name || 'Unbekannt'}
                                   </span>
                                 </div>
                               )}

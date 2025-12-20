@@ -54,6 +54,7 @@ const TaskSchema = new mongoose.Schema({
   title: { type: String, required: true },
   category: { type: String, required: true },
   deadline: Date,
+  assignedTo: { type: String, default: null }, // User ID der zugewiesenen Person
   completed: { type: Boolean, default: false },
   completedAt: Date,
   completedBy: String,
