@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/haushaltsplaner
+      - JWT_SECRET=${JWT_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL:-*}
+      - NODE_ENV=production
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - mongo
+    restart: unless-stopped
+    networks:
+      - haushaltsplaner-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  mongo:
+    image: mongo:7
+    # Port nicht nach außen exponieren für Sicherheit
+    # ports:
+    #   - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+    restart: unless-stopped
+    networks:
+      - haushaltsplaner-network
+    # Optional: MongoDB mit Authentifizierung
+    # environment:
+    #   - MONGO_INITDB_ROOT_USERNAME=admin
+    #   - MONGO_INITDB_ROOT_PASSWORD=your-secure-password
+
+  # Mongo Express - NUR für Development/Debugging
+  # In Produktion sollte dies deaktiviert oder besser gesichert sein
+  # mongo-express:
+  #   image: mongo-express:latest
+  #   ports:
+  #     - "127.0.0.1:8081:8081"  # Nur lokal erreichbar
+  #   environment:
+  #     - ME_CONFIG_MONGODB_SERVER=mongo
+  #     - ME_CONFIG_MONGODB_PORT=27017
+  #     - ME_CONFIG_BASICAUTH_USERNAME=${MONGO_EXPRESS_USER:-admin}
+  #     - ME_CONFIG_BASICAUTH_PASSWORD=${MONGO_EXPRESS_PASSWORD:-secure-password}
+  #   depends_on:
+  #     - mongo
+  #   restart: unless-stopped
+  #   networks:
+  #     - haushaltsplaner-network
+
+volumes:
+  mongo-data:
+    driver: local
+  mongo-config:
+    driver: local
+
+networks:
+  haushaltsplaner-network:
+    driver: bridge

@@ -44,31 +44,66 @@ npm run dev
 
 ## 📦 Produktion Deployment
 
-### Backend deployen
-```bash
-# .env Datei erstellen
-cp backend/.env.example backend/.env
-# Dann JWT_SECRET anpassen!
+### Schnell-Deployment mit Script
 
-# Container starten
+```bash
+# Automatisches Deployment
+./deploy-server.sh
+```
+
+Das Script führt automatisch aus:
+- Erstellt .env Datei mit sicherem JWT_SECRET
+- Baut Docker Images
+- Startet Container
+- Prüft Health Status
+
+### Backend auf Server deployen
+
+**Vollständige Anleitung:** Siehe [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.md)
+
+**Kurzversion:**
+
+```bash
+# 1. Auf den Server
+ssh user@dein-server
+
+# 2. Repository klonen
+git clone https://github.com/breeches-666/HaushaltsApp.git
+cd HaushaltsApp
+
+# 3. .env konfigurieren
+cd backend
+cp .env.example .env
+nano .env  # JWT_SECRET ändern!
+
+# 4. Container starten
+cd ..
 docker compose up -d
 
-# Logs prüfen
-docker compose logs -f
+# 5. Nginx als Reverse Proxy (optional aber empfohlen)
+sudo cp nginx/haushaltsapp-backend.conf /etc/nginx/sites-available/
+sudo ln -s /etc/nginx/sites-available/haushaltsapp-backend.conf /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+
+# 6. SSL mit Let's Encrypt
+sudo certbot --nginx -d backend.app.mr-dk.de
 ```
 
 ### Frontend deployen
 
-**Option 1: Netlify/Vercel**
+**Option 1: Netlify/Vercel (empfohlen)**
 - Repository verbinden
-- Build Command: `npm run build`
-- Publish Directory: `dist`
+- Build Command: `cd frontend && npm run build`
+- Publish Directory: `frontend/dist`
+- Environment Variable: `VITE_API_URL=https://backend.app.mr-dk.de/api`
 
 **Option 2: Eigener Server mit Nginx**
 ```bash
 cd frontend
+npm install
 npm run build
-# dist/ Ordner auf Server kopieren
+# dist/ Ordner auf Server kopieren und mit Nginx servieren
 ```
 
 ## 🔒 Sicherheit
