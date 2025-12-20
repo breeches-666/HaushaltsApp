@@ -367,41 +367,38 @@ export default function HouseholdPlanner() {
     setHouseholds([]);
   };
 
-  // Hilfsfunktion: datetime-local zu UTC ohne Zeitverschiebung
+  // Hilfsfunktion: datetime-local zu ISO String (mit korrekter Zeitzone)
   const localToUTC = (datetimeLocal) => {
     if (!datetimeLocal) return null;
-    // Splitte "2024-12-19T09:00" in Komponenten
-    const [date, time] = datetimeLocal.split('T');
-    const [year, month, day] = date.split('-');
-    const [hours, minutes] = time.split(':');
-    // Erstelle UTC Date OHNE Zeitverschiebung
-    const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-    return utcDate.toISOString();
+    // datetime-local Format: "2024-01-15T10:00"
+    // new Date interpretiert das als lokale Zeit und konvertiert korrekt zu UTC
+    const date = new Date(datetimeLocal);
+    return date.toISOString();
   };
 
-  // Hilfsfunktion: UTC zu datetime-local ohne Zeitverschiebung
+  // Hilfsfunktion: ISO String zu datetime-local Format (mit korrekter Zeitzone)
   const utcToLocal = (isoString) => {
     if (!isoString) return '';
     const date = new Date(isoString);
-    // Extrahiere UTC Komponenten (NICHT lokale!)
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    // datetime-local benötigt Format: "2024-01-15T10:00" in lokaler Zeit
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
-  // Hilfsfunktion: Formatiere Datum für Anzeige ohne Zeitverschiebung
+  // Hilfsfunktion: Formatiere Datum für Anzeige
   const formatDate = (isoString) => {
     if (!isoString) return '';
     const date = new Date(isoString);
-    // Nutze UTC Komponenten für Anzeige
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const year = date.getUTCFullYear();
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    // Nutze lokale Zeit für Anzeige
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${day}.${month}.${year} ${hours}:${minutes}`;
   };
 
