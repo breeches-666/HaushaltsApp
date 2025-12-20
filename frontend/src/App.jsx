@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home } from 'lucide-react';
+import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home, RefreshCw } from 'lucide-react';
 
 // Backend API URL - Für lokale Entwicklung
 const API_URL = 'https://backend.app.mr-dk.de/api';
@@ -15,6 +15,7 @@ export default function HouseholdPlanner() {
   const [registerName, setRegisterName] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [households, setHouseholds] = useState([]);
   const [selectedHousehold, setSelectedHousehold] = useState(null);
@@ -99,6 +100,32 @@ export default function HouseholdPlanner() {
       console.error('Fehler beim Laden:', error);
     }
   };
+
+  // Manuelle Aktualisierung
+  const refreshData = async () => {
+    if (!selectedHousehold || !token) return;
+
+    setIsRefreshing(true);
+    try {
+      await loadHouseholdData(selectedHousehold._id, token);
+      await loadHouseholds(token);
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren:', error);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500); // Kurzes Feedback
+    }
+  };
+
+  // Auto-Refresh alle 10 Sekunden
+  useEffect(() => {
+    if (!selectedHousehold || !token) return;
+
+    const intervalId = setInterval(() => {
+      loadHouseholdData(selectedHousehold._id, token);
+    }, 10000); // 10 Sekunden
+
+    return () => clearInterval(intervalId);
+  }, [selectedHousehold, token]);
 
   // Haushalt wechseln
   const switchHousehold = (household) => {
@@ -710,6 +737,18 @@ export default function HouseholdPlanner() {
                 <h1 className="text-xl font-bold text-gray-800">{selectedHousehold.name}</h1>
                 <p className="text-sm text-gray-600">Hallo, {currentUser?.name}!</p>
               </div>
+              <button
+                onClick={refreshData}
+                disabled={isRefreshing}
+                className={`p-2 rounded-lg transition-all ${
+                  isRefreshing
+                    ? 'text-indigo-600 animate-spin'
+                    : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50'
+                }`}
+                title="Aktualisieren (automatisch alle 10 Sek.)"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
             </div>
             <div className="flex items-center gap-2">
               {pendingInvites.length > 0 && (
