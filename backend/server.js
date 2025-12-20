@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 // TEMPORÄR DEAKTIVIERT - const admin = require('firebase-admin');
-const cron = require('node-cron');
+// TEMPORÄR DEAKTIVIERT - const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
