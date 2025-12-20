@@ -3,13 +3,14 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const admin = require('firebase-admin');
+// TEMPORÄR DEAKTIVIERT - const admin = require('firebase-admin');
 const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
 
-// Firebase Admin SDK initialisieren
+// Firebase Admin SDK initialisieren - TEMPORÄR DEAKTIVIERT
+/*
 // Wichtig: In Production muss FIREBASE_SERVICE_ACCOUNT als JSON string in .env gesetzt sein
 // Beispiel: FIREBASE_SERVICE_ACCOUNT='{"type":"service_account",...}'
 try {
@@ -25,6 +26,7 @@ try {
 } catch (error) {
   console.error('❌ Firebase Initialisierung fehlgeschlagen:', error.message);
 }
+*/
 
 // Middleware
 // CORS-Konfiguration - erlaubt alle Origins
@@ -109,7 +111,8 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Push Notification Hilfsfunktionen
+// Push Notification Hilfsfunktionen - TEMPORÄR DEAKTIVIERT
+/*
 const sendPushNotification = async (userId, title, body, data = {}) => {
   try {
     // Prüfe ob Firebase initialisiert ist
@@ -159,6 +162,7 @@ const sendPushNotification = async (userId, title, body, data = {}) => {
     return false;
   }
 };
+*/
 
 // Auth Routes
 app.post('/api/register', async (req, res) => {
@@ -406,7 +410,8 @@ app.post('/api/households/:id/invite', authenticateToken, async (req, res) => {
     });
     await household.save();
 
-    // Sende Push Notification an eingeladenen User
+    // Sende Push Notification an eingeladenen User - TEMPORÄR DEAKTIVIERT
+    /*
     const inviter = await User.findById(req.user.id);
     await sendPushNotification(
       invitedUser._id,
@@ -414,6 +419,7 @@ app.post('/api/households/:id/invite', authenticateToken, async (req, res) => {
       `${inviter.name} hat dich zu "${household.name}" eingeladen`,
       { type: 'invitation', householdId: household._id.toString() }
     );
+    */
 
     res.json({ message: 'Einladung versendet', household });
   } catch (error) {
@@ -556,7 +562,8 @@ app.post('/api/tasks', authenticateToken, async (req, res) => {
     });
     await task.save();
 
-    // Push Notifications senden
+    // Push Notifications senden - TEMPORÄR DEAKTIVIERT
+    /*
     const creator = await User.findById(req.user.id);
     const category = await Category.findById(task.category);
 
@@ -580,6 +587,7 @@ app.post('/api/tasks', authenticateToken, async (req, res) => {
         { type: 'task_assigned', taskId: task._id.toString(), householdId }
       );
     }
+    */
 
     res.json(task);
   } catch (error) {
@@ -615,7 +623,8 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
     Object.assign(task, req.body);
     await task.save();
 
-    // Push Notification bei Zuweisung (nur wenn sich assignedTo geändert hat)
+    // Push Notification bei Zuweisung (nur wenn sich assignedTo geändert hat) - TEMPORÄR DEAKTIVIERT
+    /*
     if (req.body.assignedTo !== undefined &&
         req.body.assignedTo !== oldAssignedTo &&
         req.body.assignedTo !== req.user.id) {
@@ -627,6 +636,7 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
         { type: 'task_assigned', taskId: task._id.toString(), householdId: task.householdId }
       );
     }
+    */
 
     res.json(task);
   } catch (error) {
@@ -728,7 +738,8 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
-// Cron Job für Deadline-Benachrichtigungen (läuft alle 5 Minuten)
+// Cron Job für Deadline-Benachrichtigungen - TEMPORÄR DEAKTIVIERT
+/*
 cron.schedule('*/5 * * * *', async () => {
   try {
     console.log('⏰ Prüfe Deadline-Benachrichtigungen...');
@@ -803,6 +814,7 @@ cron.schedule('*/5 * * * *', async () => {
     console.error('❌ Fehler bei Deadline-Benachrichtigungen:', error);
   }
 });
+*/
 
 // Server starten
 const PORT = process.env.PORT || 3000;
