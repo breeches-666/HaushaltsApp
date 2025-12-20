@@ -106,6 +106,32 @@ export default function HouseholdPlanner() {
     loadHouseholdData(household._id, token);
   };
 
+  // Gemeinsamen Haushalt erstellen
+  const createSharedHousehold = async () => {
+    const name = prompt('Name des gemeinsamen Haushalts:');
+    if (!name || !name.trim()) return;
+
+    try {
+      const response = await fetch(`${API_URL}/households`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name: name.trim(), isPrivate: false })
+      });
+
+      if (!response.ok) throw new Error('Fehler beim Erstellen');
+
+      const newHousehold = await response.json();
+      await loadHouseholds(token);
+      switchHousehold(newHousehold);
+      alert('Gemeinsamer Haushalt erstellt! Du kannst jetzt andere Personen einladen.');
+    } catch (error) {
+      alert('Fehler beim Erstellen des Haushalts');
+    }
+  };
+
   // Einladung annehmen
   const acceptInvite = async (householdId) => {
     try {
@@ -695,6 +721,14 @@ export default function HouseholdPlanner() {
                 </div>
               )}
               <button
+                onClick={createSharedHousehold}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                title="Gemeinsamen Haushalt erstellen"
+              >
+                <FolderPlus className="w-5 h-5" />
+                <span className="hidden sm:inline">Gemeinsam</span>
+              </button>
+              <button
                 onClick={() => setShowSettings(true)}
                 className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
               >
@@ -726,7 +760,12 @@ export default function HouseholdPlanner() {
                 >
                   <Home className="w-4 h-4" />
                   {h.name}
-                  <span className="text-xs opacity-75">({h.members.length})</span>
+                  {h.isPrivate && (
+                    <span className="text-xs opacity-75">🔒</span>
+                  )}
+                  {!h.isPrivate && (
+                    <span className="text-xs opacity-75">({h.members.length})</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -825,16 +864,26 @@ export default function HouseholdPlanner() {
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                     <Users className="w-5 h-5" />
-                    Mitglieder ({selectedHousehold.members.length})
+                    {selectedHousehold.isPrivate ? 'Privater Haushalt 🔒' : `Mitglieder (${selectedHousehold.members.length})`}
                   </h4>
-                  <button
-                    onClick={() => setShowInviteModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                  >
-                    <Mail className="w-4 h-4" />
-                    Einladen
-                  </button>
+                  {!selectedHousehold.isPrivate && (
+                    <button
+                      onClick={() => setShowInviteModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                    >
+                      <Mail className="w-4 h-4" />
+                      Einladen
+                    </button>
+                  )}
                 </div>
+
+                {selectedHousehold.isPrivate && (
+                  <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <p className="text-sm text-yellow-800">
+                      <strong>Privater Haushalt:</strong> Dieser Haushalt ist nur für dich. Um Aufgaben mit anderen zu teilen, erstelle einen gemeinsamen Haushalt über den grünen "Gemeinsam"-Button oben.
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   {selectedHousehold.memberDetails?.map(member => (
