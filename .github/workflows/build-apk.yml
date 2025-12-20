@@ -40,6 +40,12 @@ jobs:
           fi
           npx cap sync android
 
+      - name: Create google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          echo "$GOOGLE_SERVICES_JSON" > frontend/android/app/google-services.json
+
       - name: Build APK
         run: |
           cd frontend/android
