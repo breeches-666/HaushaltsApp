@@ -808,8 +808,8 @@ export default function HouseholdPlanner() {
 
         {/* Einstellungen Modal */}
         {showSettings && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl p-6 w-full max-w-2xl my-8">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-8">
+            <div className="bg-white rounded-xl p-6 w-full max-w-2xl my-4 sm:my-8 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold text-gray-800">Einstellungen</h3>
                 <button
@@ -934,8 +934,8 @@ export default function HouseholdPlanner() {
 
         {/* Einladungs-Modal */}
         {showInviteModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Benutzer einladen</h3>
               <p className="text-gray-600 text-sm mb-4">
                 Gib die E-Mail-Adresse des Benutzers ein, den du zu "{selectedHousehold.name}" einladen möchtest.
@@ -970,8 +970,8 @@ export default function HouseholdPlanner() {
 
         {/* Neue Kategorie Modal */}
         {showAddCategory && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Neue Kategorie</h3>
               <input
                 type="text"
@@ -1012,8 +1012,8 @@ export default function HouseholdPlanner() {
 
         {/* Neue Aufgabe Modal */}
         {showAddTask && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Neue Aufgabe</h3>
               <input
                 type="text"
@@ -1061,8 +1061,8 @@ export default function HouseholdPlanner() {
 
         {/* Aufgabe bearbeiten Modal */}
         {showEditTask && editingTask && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Aufgabe bearbeiten</h3>
               <input
                 type="text"
