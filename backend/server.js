@@ -80,6 +80,13 @@ const TaskSchema = new mongoose.Schema({
   completedBy: String,
   hourNotified: { type: Boolean, default: false },
   overdueNotified: { type: Boolean, default: false },
+  // Wiederkehrende Aufgaben
+  recurrence: {
+    enabled: { type: Boolean, default: false },
+    frequency: { type: String, enum: ['daily', 'weekly', 'monthly'], default: 'weekly' },
+    interval: { type: Number, default: 1 }, // z.B. alle 2 Wochen = interval: 2, frequency: 'weekly'
+    lastRecurrence: Date // Wann wurde die Task zuletzt wiederholt
+  },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -522,7 +529,7 @@ app.delete('/api/households/:householdId/members/:userId', authenticateToken, as
 app.get('/api/tasks', authenticateToken, async (req, res) => {
   try {
     const { householdId } = req.query;
-    
+
     if (!householdId) {
       return res.status(400).json({ error: 'householdId erforderlich' });
     }
@@ -537,6 +544,37 @@ app.get('/api/tasks', authenticateToken, async (req, res) => {
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ error: 'Fehler beim Laden der Aufgaben' });
+  }
+});
+
+// Kalender-Ansicht: Tasks in einem Datumsbereich
+app.get('/api/tasks/calendar', authenticateToken, async (req, res) => {
+  try {
+    const { householdId, startDate, endDate } = req.query;
+
+    if (!householdId) {
+      return res.status(400).json({ error: 'householdId erforderlich' });
+    }
+
+    // Prüfe ob User Mitglied ist
+    const household = await Household.findById(householdId);
+    if (!household || !household.members.includes(req.user.id)) {
+      return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+
+    // Query für Tasks mit Deadline im angegebenen Bereich
+    const query = { householdId };
+
+    if (startDate || endDate) {
+      query.deadline = {};
+      if (startDate) query.deadline.$gte = new Date(startDate);
+      if (endDate) query.deadline.$lte = new Date(endDate);
+    }
+
+    const tasks = await Task.find(query).sort({ deadline: 1 });
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Laden der Kalender-Aufgaben' });
   }
 });
 
@@ -614,6 +652,51 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
 
     Object.assign(task, req.body);
     await task.save();
+
+    // Wiederkehrende Aufgaben: Erstelle neue Task wenn completed und recurrence aktiviert
+    if (req.body.completed && task.recurrence && task.recurrence.enabled) {
+      const calculateNextDeadline = (currentDeadline, frequency, interval) => {
+        if (!currentDeadline) return null;
+        const next = new Date(currentDeadline);
+
+        switch (frequency) {
+          case 'daily':
+            next.setDate(next.getDate() + interval);
+            break;
+          case 'weekly':
+            next.setDate(next.getDate() + (interval * 7));
+            break;
+          case 'monthly':
+            next.setMonth(next.getMonth() + interval);
+            break;
+        }
+        return next;
+      };
+
+      const nextDeadline = calculateNextDeadline(
+        task.deadline,
+        task.recurrence.frequency,
+        task.recurrence.interval
+      );
+
+      // Erstelle neue wiederkehrende Task
+      const newRecurringTask = new Task({
+        householdId: task.householdId,
+        title: task.title,
+        category: task.category,
+        deadline: nextDeadline,
+        assignedTo: task.assignedTo,
+        completed: false,
+        recurrence: {
+          enabled: true,
+          frequency: task.recurrence.frequency,
+          interval: task.recurrence.interval,
+          lastRecurrence: new Date()
+        }
+      });
+      await newRecurringTask.save();
+      console.log(`✅ Wiederkehrende Aufgabe erstellt: "${task.title}" (neues Datum: ${nextDeadline})`);
+    }
 
     // Push Notification bei Zuweisung (nur wenn sich assignedTo geändert hat)
     if (req.body.assignedTo !== undefined &&

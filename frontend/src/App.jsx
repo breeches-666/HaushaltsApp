@@ -29,8 +29,15 @@ export default function HouseholdPlanner() {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
-  const [newTask, setNewTask] = useState({ title: '', category: '', deadline: '', assignedTo: '' });
+  const [newTask, setNewTask] = useState({
+    title: '',
+    category: '',
+    deadline: '',
+    assignedTo: '',
+    recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
+  });
   const [newCategory, setNewCategory] = useState({ name: '', color: '#3b82f6' });
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showCompleted, setShowCompleted] = useState(false);
@@ -548,7 +555,8 @@ export default function HouseholdPlanner() {
         category: newTask.category,
         householdId: selectedHousehold._id,
         deadline: localToUTC(newTask.deadline),
-        assignedTo: newTask.assignedTo || null
+        assignedTo: newTask.assignedTo || null,
+        recurrence: newTask.recurrence
       };
 
       console.log('📤 Sende neue Task mit assignedTo:', taskData.assignedTo);
@@ -569,7 +577,13 @@ export default function HouseholdPlanner() {
       console.log('   - assignedTo:', task.assignedTo);
 
       setTasks([...tasks, task]);
-      setNewTask({ title: '', category: '', deadline: '', assignedTo: '' });
+      setNewTask({
+        title: '',
+        category: '',
+        deadline: '',
+        assignedTo: '',
+        recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
+      });
       setShowAddTask(false);
     } catch (error) {
       alert('Fehler beim Erstellen der Aufgabe');
@@ -580,7 +594,8 @@ export default function HouseholdPlanner() {
   const openEditTask = (task) => {
     setEditingTask({
       ...task,
-      deadline: utcToLocal(task.deadline)
+      deadline: utcToLocal(task.deadline),
+      recurrence: task.recurrence || { enabled: false, frequency: 'weekly', interval: 1 }
     });
     setShowEditTask(true);
   };
@@ -597,7 +612,8 @@ export default function HouseholdPlanner() {
         title: editingTask.title,
         category: editingTask.category,
         deadline: localToUTC(editingTask.deadline),
-        assignedTo: editingTask.assignedTo || null
+        assignedTo: editingTask.assignedTo || null,
+        recurrence: editingTask.recurrence
       };
 
       console.log('📤 Update Task mit assignedTo:', updates.assignedTo);
@@ -1069,6 +1085,13 @@ export default function HouseholdPlanner() {
             <Plus className="w-5 h-5" />
             Neue Aufgabe hinzufügen
           </button>
+          <button
+            onClick={() => setShowCalendar(true)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors mt-3"
+          >
+            <Calendar className="w-5 h-5" />
+            Kalenderansicht
+          </button>
         </div>
 
         {/* Einstellungen Modal */}
@@ -1341,6 +1364,56 @@ export default function HouseholdPlanner() {
                   ))}
                 </select>
               )}
+
+              {/* Wiederkehrende Aufgabe */}
+              <div className="mb-4 p-3 border border-gray-300 rounded-lg">
+                <label className="flex items-center gap-2 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={newTask.recurrence.enabled}
+                    onChange={(e) => setNewTask({
+                      ...newTask,
+                      recurrence: { ...newTask.recurrence, enabled: e.target.checked }
+                    })}
+                    className="w-4 h-4"
+                  />
+                  <span className="font-medium text-gray-700">Wiederkehrende Aufgabe</span>
+                </label>
+                {newTask.recurrence.enabled && (
+                  <div className="mt-2 space-y-2">
+                    <select
+                      value={newTask.recurrence.frequency}
+                      onChange={(e) => setNewTask({
+                        ...newTask,
+                        recurrence: { ...newTask.recurrence, frequency: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="daily">Täglich</option>
+                      <option value="weekly">Wöchentlich</option>
+                      <option value="monthly">Monatlich</option>
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">Alle</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={newTask.recurrence.interval}
+                        onChange={(e) => setNewTask({
+                          ...newTask,
+                          recurrence: { ...newTask.recurrence, interval: parseInt(e.target.value) || 1 }
+                        })}
+                        className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                      <span className="text-sm text-gray-600">
+                        {newTask.recurrence.frequency === 'daily' ? 'Tag(e)' :
+                         newTask.recurrence.frequency === 'weekly' ? 'Woche(n)' : 'Monat(e)'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2">
                 <button
                   onClick={handleAddTask}
@@ -1351,7 +1424,13 @@ export default function HouseholdPlanner() {
                 <button
                   onClick={() => {
                     setShowAddTask(false);
-                    setNewTask({ title: '', category: '', deadline: '', assignedTo: '' });
+                    setNewTask({
+                      title: '',
+                      category: '',
+                      deadline: '',
+                      assignedTo: '',
+                      recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
+                    });
                   }}
                   className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
                 >
@@ -1402,6 +1481,61 @@ export default function HouseholdPlanner() {
                   ))}
                 </select>
               )}
+
+              {/* Wiederkehrende Aufgabe */}
+              <div className="mb-4 p-3 border border-gray-300 rounded-lg">
+                <label className="flex items-center gap-2 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={editingTask.recurrence?.enabled || false}
+                    onChange={(e) => setEditingTask({
+                      ...editingTask,
+                      recurrence: {
+                        ...editingTask.recurrence,
+                        enabled: e.target.checked,
+                        frequency: editingTask.recurrence?.frequency || 'weekly',
+                        interval: editingTask.recurrence?.interval || 1
+                      }
+                    })}
+                    className="w-4 h-4"
+                  />
+                  <span className="font-medium text-gray-700">Wiederkehrende Aufgabe</span>
+                </label>
+                {editingTask.recurrence?.enabled && (
+                  <div className="mt-2 space-y-2">
+                    <select
+                      value={editingTask.recurrence.frequency}
+                      onChange={(e) => setEditingTask({
+                        ...editingTask,
+                        recurrence: { ...editingTask.recurrence, frequency: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="daily">Täglich</option>
+                      <option value="weekly">Wöchentlich</option>
+                      <option value="monthly">Monatlich</option>
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">Alle</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={editingTask.recurrence.interval}
+                        onChange={(e) => setEditingTask({
+                          ...editingTask,
+                          recurrence: { ...editingTask.recurrence, interval: parseInt(e.target.value) || 1 }
+                        })}
+                        className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                      <span className="text-sm text-gray-600">
+                        {editingTask.recurrence.frequency === 'daily' ? 'Tag(e)' :
+                         editingTask.recurrence.frequency === 'weekly' ? 'Woche(n)' : 'Monat(e)'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2">
                 <button
                   onClick={handleEditTask}
@@ -1418,6 +1552,107 @@ export default function HouseholdPlanner() {
                 >
                   Abbrechen
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Kalenderansicht Modal */}
+        {showCalendar && selectedHousehold && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-8">
+            <div className="bg-white rounded-xl p-6 w-full max-w-4xl my-4">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-800">Kalenderansicht</h3>
+                <button
+                  onClick={() => setShowCalendar(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {(() => {
+                  // Gruppiere Tasks nach Datum
+                  const tasksByDate = {};
+                  const today = new Date();
+                  const nextDays = 14; // Zeige nächsten 14 Tage
+
+                  // Initialisiere die nächsten 14 Tage
+                  for (let i = 0; i < nextDays; i++) {
+                    const date = new Date(today);
+                    date.setDate(date.getDate() + i);
+                    const dateKey = date.toISOString().split('T')[0];
+                    tasksByDate[dateKey] = [];
+                  }
+
+                  // Füge Tasks zu den entsprechenden Daten hinzu
+                  tasks.filter(task => task.deadline && !task.completed).forEach(task => {
+                    const taskDate = new Date(task.deadline).toISOString().split('T')[0];
+                    if (tasksByDate[taskDate]) {
+                      tasksByDate[taskDate].push(task);
+                    }
+                  });
+
+                  return Object.entries(tasksByDate).map(([dateKey, dateTasks]) => {
+                    const date = new Date(dateKey);
+                    const isToday = dateKey === today.toISOString().split('T')[0];
+                    const dayName = date.toLocaleDateString('de-DE', { weekday: 'long' });
+                    const dateStr = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+                    return (
+                      <div key={dateKey} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className={`px-3 py-1 rounded-lg ${isToday ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'}`}>
+                            <span className="font-bold">{dayName}</span>
+                            <span className="ml-2 text-sm">{dateStr}</span>
+                          </div>
+                          <span className="text-sm text-gray-500">
+                            {dateTasks.length} {dateTasks.length === 1 ? 'Aufgabe' : 'Aufgaben'}
+                          </span>
+                        </div>
+
+                        {dateTasks.length === 0 ? (
+                          <p className="text-gray-400 text-sm italic ml-2">Keine Aufgaben</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {dateTasks.map(task => {
+                              const category = categories.find(cat => cat._id === task.category);
+                              const assignedMember = selectedHousehold.memberDetails?.find(m => m._id === task.assignedTo);
+                              const taskTime = new Date(task.deadline).toLocaleTimeString('de-DE', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              });
+
+                              return (
+                                <div
+                                  key={task._id}
+                                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                                  onClick={() => openEditTask(task)}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <div
+                                    className="w-3 h-3 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: category?.color || '#6B7280' }}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-gray-800">{task.title}</div>
+                                    <div className="text-sm text-gray-500">
+                                      {taskTime}
+                                      {category && ` • ${category.name}`}
+                                      {assignedMember && ` • ${assignedMember.name}`}
+                                      {task.recurrence?.enabled && ' • 🔄'}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
           </div>
@@ -1499,6 +1734,15 @@ export default function HouseholdPlanner() {
                                 <User className="w-3 h-3" />
                                 <span>
                                   {selectedHousehold.memberDetails.find(m => m._id === task.assignedTo)?.name || 'Unbekannt'}
+                                </span>
+                              </div>
+                            )}
+                            {task.recurrence?.enabled && (
+                              <div className="flex items-center gap-1 text-xs text-green-600" title="Wiederkehrende Aufgabe">
+                                <RefreshCw className="w-3 h-3" />
+                                <span>
+                                  {task.recurrence.frequency === 'daily' ? 'Täglich' :
+                                   task.recurrence.frequency === 'weekly' ? 'Wöchentlich' : 'Monatlich'}
                                 </span>
                               </div>
                             )}
