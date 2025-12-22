@@ -848,12 +848,12 @@ export default function HouseholdPlanner() {
   if (showLogin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-8">
             <div className="inline-block p-3 bg-indigo-100 rounded-full mb-4">
               <User className="w-8 h-8 text-indigo-600" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-800">Haushaltsplaner</h1>
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Haushaltsplaner</h1>
             <p className="text-gray-600 mt-2">
               {isRegistering ? 'Neues Konto erstellen' : 'Willkommen zurück'}
             </p>
@@ -866,7 +866,7 @@ export default function HouseholdPlanner() {
                 placeholder="E-Mail"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <input
                 type="password"
@@ -874,7 +874,7 @@ export default function HouseholdPlanner() {
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <button
                 onClick={handleLogin}
@@ -897,14 +897,14 @@ export default function HouseholdPlanner() {
                 placeholder="Name"
                 value={registerName}
                 onChange={(e) => setRegisterName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <input
                 type="email"
                 placeholder="E-Mail"
                 value={registerEmail}
                 onChange={(e) => setRegisterEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <input
                 type="password"
@@ -912,7 +912,7 @@ export default function HouseholdPlanner() {
                 value={registerPassword}
                 onChange={(e) => setRegisterPassword(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <button
                 onClick={handleRegister}
@@ -938,32 +938,32 @@ export default function HouseholdPlanner() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="text-center">
-          <p className="text-gray-600">Lade Haushalt...</p>
+          <p className="text-gray-600 dark:text-gray-400">Lade Haushalt...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="bg-white shadow-md">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 shadow-md">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-100 rounded-lg">
-                <Calendar className="w-6 h-6 text-indigo-600" />
+              <div className="p-2 bg-indigo-100 dark:bg-indigo-900 rounded-lg">
+                <Calendar className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-800">{selectedHousehold.name}</h1>
-                <p className="text-sm text-gray-600">Hallo, {currentUser?.name}!</p>
+                <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">{selectedHousehold.name}</h1>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Hallo, {currentUser?.name}!</p>
               </div>
               <button
                 onClick={refreshData}
                 disabled={isRefreshing}
                 className={`p-2 rounded-lg transition-all ${
                   isRefreshing
-                    ? 'text-indigo-600 animate-spin'
-                    : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50'
+                    ? 'text-indigo-600 dark:text-indigo-400 animate-spin'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30'
                 }`}
                 title="Aktualisieren (automatisch alle 10 Sek.)"
               >
@@ -973,7 +973,7 @@ export default function HouseholdPlanner() {
             <div className="flex items-center gap-2">
               {pendingInvites.length > 0 && (
                 <div className="relative">
-                  <Mail className="w-6 h-6 text-indigo-600" />
+                  <Mail className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                   <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                     {pendingInvites.length}
                   </span>
@@ -1014,7 +1014,7 @@ export default function HouseholdPlanner() {
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
                     selectedHousehold._id === h._id
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
                   }`}
                 >
                   <Home className="w-4 h-4" />
@@ -1037,8 +1037,8 @@ export default function HouseholdPlanner() {
                 📨 Du hast {pendingInvites.length} neue Einladung(en)
               </p>
               {pendingInvites.map(invite => (
-                <div key={invite.householdId} className="flex items-center justify-between bg-white rounded p-3 mb-2">
-                  <span className="text-gray-800">{invite.householdName}</span>
+                <div key={invite.householdId} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded p-3 mb-2">
+                  <span className="text-gray-800 dark:text-gray-100">{invite.householdName}</span>
                   <div className="flex gap-2">
                     <button
                       onClick={() => acceptInvite(invite.householdId)}
@@ -1061,9 +1061,9 @@ export default function HouseholdPlanner() {
       </div>
 
       <div className="max-w-6xl mx-auto p-4">
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-800">Kategorien</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Kategorien</h2>
           </div>
 
           <div className="flex flex-wrap gap-2 mb-4">
@@ -1072,7 +1072,7 @@ export default function HouseholdPlanner() {
               className={`px-4 py-2 rounded-lg transition-colors ${
                 selectedCategory === 'all'
                   ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
               }`}
             >
               Alle ({tasks.length})
@@ -1084,7 +1084,7 @@ export default function HouseholdPlanner() {
                 className={`px-4 py-2 rounded-lg transition-colors ${
                   selectedCategory === cat._id
                     ? 'text-white'
-                    : 'text-gray-700 hover:opacity-80'
+                    : 'text-gray-700 dark:text-gray-300 hover:opacity-80'
                 }`}
                 style={{
                   backgroundColor: selectedCategory === cat._id ? cat.color : `${cat.color}40`
@@ -1097,14 +1097,14 @@ export default function HouseholdPlanner() {
 
           {selectedHousehold && !selectedHousehold.isPrivate && (
             <div className="mb-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Zuweisung</h3>
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Zuweisung</h3>
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setAssignmentFilter('all')}
                   className={`px-4 py-2 rounded-lg transition-colors ${
                     assignmentFilter === 'all'
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
                   }`}
                 >
                   Alle
@@ -1114,7 +1114,7 @@ export default function HouseholdPlanner() {
                   className={`px-4 py-2 rounded-lg transition-colors ${
                     assignmentFilter === 'mine'
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
                   }`}
                 >
                   Meine Aufgaben
@@ -1124,7 +1124,7 @@ export default function HouseholdPlanner() {
                   className={`px-4 py-2 rounded-lg transition-colors ${
                     assignmentFilter === 'unassigned'
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
                   }`}
                 >
                   Nicht zugewiesen
@@ -1152,12 +1152,12 @@ export default function HouseholdPlanner() {
         {/* Einstellungen Modal */}
         {showSettings && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-8">
-            <div className="bg-white rounded-xl p-6 w-full max-w-2xl my-4 sm:my-8 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-2xl my-4 sm:my-8 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-800">Einstellungen</h3>
+                <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Einstellungen</h3>
                 <button
                   onClick={() => setShowSettings(false)}
-                  className="p-2 text-gray-500 hover:text-gray-700"
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700"
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -1196,7 +1196,7 @@ export default function HouseholdPlanner() {
                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
                     >
                       <div>
-                        <p className="font-medium text-gray-800">{member.name}</p>
+                        <p className="font-medium text-gray-800 dark:text-gray-100">{member.name}</p>
                         <p className="text-sm text-gray-500">{member.email}</p>
                         {member._id === selectedHousehold.createdBy && (
                           <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded mt-1 inline-block">
@@ -1223,7 +1223,7 @@ export default function HouseholdPlanner() {
                     {selectedHousehold.invites
                       .filter(inv => inv.status === 'pending')
                       .map((inv, idx) => (
-                        <div key={idx} className="text-sm text-gray-500 bg-yellow-50 p-2 rounded mb-1">
+                        <div key={idx} className="text-sm text-gray-500 dark:text-gray-400 bg-yellow-50 p-2 rounded mb-1">
                           📧 {inv.email} - Eingeladen am {new Date(inv.invitedAt).toLocaleDateString('de-DE')}
                         </div>
                       ))}
@@ -1249,7 +1249,7 @@ export default function HouseholdPlanner() {
 
               <div className="border-t pt-6 mb-6">
                 <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-lg font-semibold text-gray-800">Kategorien verwalten</h4>
+                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Kategorien verwalten</h4>
                   <button
                     onClick={() => setShowAddCategory(true)}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
@@ -1261,7 +1261,7 @@ export default function HouseholdPlanner() {
 
                 <div className="space-y-2">
                   {categories.length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">Keine Kategorien vorhanden</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-center py-8">Keine Kategorien vorhanden</p>
                   ) : (
                     categories.map(cat => (
                       <div
@@ -1273,7 +1273,7 @@ export default function HouseholdPlanner() {
                             className="w-6 h-6 rounded"
                             style={{ backgroundColor: cat.color }}
                           />
-                          <span className="font-medium text-gray-800">{cat.name}</span>
+                          <span className="font-medium text-gray-800 dark:text-gray-100">{cat.name}</span>
                           <span className="text-sm text-gray-500">
                             ({tasks.filter(t => t.category === cat._id).length} Aufgaben)
                           </span>
@@ -1305,7 +1305,7 @@ export default function HouseholdPlanner() {
                 <h4 className="text-lg font-semibold text-gray-800 mb-4">Darstellung</h4>
                 <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                   <div>
-                    <p className="font-medium text-gray-800">Dark Mode</p>
+                    <p className="font-medium text-gray-800 dark:text-gray-100">Dark Mode</p>
                     <p className="text-sm text-gray-500">Dunkles Farbschema aktivieren</p>
                   </div>
                   <button
@@ -1326,8 +1326,8 @@ export default function HouseholdPlanner() {
               <div className="border-t pt-6">
                 <h4 className="text-lg font-semibold text-gray-800 mb-4">Konto</h4>
                 <div className="space-y-2">
-                  <p className="text-gray-600"><strong>Name:</strong> {currentUser?.name}</p>
-                  <p className="text-gray-600"><strong>E-Mail:</strong> {currentUser?.email}</p>
+                  <p className="text-gray-600 dark:text-gray-400"><strong>Name:</strong> {currentUser?.name}</p>
+                  <p className="text-gray-600 dark:text-gray-400"><strong>E-Mail:</strong> {currentUser?.email}</p>
                 </div>
               </div>
             </div>
@@ -1337,7 +1337,7 @@ export default function HouseholdPlanner() {
         {/* Einladungs-Modal */}
         {showInviteModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Benutzer einladen</h3>
               <p className="text-gray-600 text-sm mb-4">
                 Gib die E-Mail-Adresse des Benutzers ein, den du zu "{selectedHousehold.name}" einladen möchtest.
@@ -1347,7 +1347,7 @@ export default function HouseholdPlanner() {
                 placeholder="E-Mail-Adresse"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
               <div className="flex gap-2">
                 <button
@@ -1361,7 +1361,7 @@ export default function HouseholdPlanner() {
                     setShowInviteModal(false);
                     setInviteEmail('');
                   }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
                 >
                   Abbrechen
                 </button>
@@ -1373,17 +1373,17 @@ export default function HouseholdPlanner() {
         {/* Kategorie bearbeiten Modal */}
         {showEditCategory && editingCategory && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Kategorie bearbeiten</h3>
               <input
                 type="text"
                 placeholder="Kategoriename"
                 value={editingCategory.name}
                 onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Farbe</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Farbe</label>
                 <input
                   type="color"
                   value={editingCategory.color}
@@ -1403,7 +1403,7 @@ export default function HouseholdPlanner() {
                     setShowEditCategory(false);
                     setEditingCategory(null);
                   }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
                 >
                   Abbrechen
                 </button>
@@ -1415,17 +1415,17 @@ export default function HouseholdPlanner() {
         {/* Neue Kategorie Modal */}
         {showAddCategory && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Neue Kategorie</h3>
               <input
                 type="text"
                 placeholder="Kategoriename"
                 value={newCategory.name}
                 onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Farbe</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Farbe</label>
                 <input
                   type="color"
                   value={newCategory.color}
@@ -1445,7 +1445,7 @@ export default function HouseholdPlanner() {
                     setShowAddCategory(false);
                     setNewCategory({ name: '', color: '#3b82f6' });
                   }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
                 >
                   Abbrechen
                 </button>
@@ -1457,19 +1457,19 @@ export default function HouseholdPlanner() {
         {/* Neue Aufgabe Modal */}
         {showAddTask && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Neue Aufgabe</h3>
               <input
                 type="text"
                 placeholder="Aufgabentitel"
                 value={newTask.title}
                 onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
               <select
                 value={newTask.category}
                 onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               >
                 <option value="">Kategorie wählen</option>
                 {categories.map(cat => (
@@ -1480,11 +1480,11 @@ export default function HouseholdPlanner() {
                 type="datetime-local"
                 value={newTask.deadline}
                 onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
               {selectedHousehold && !selectedHousehold.isPrivate && (
-                <div className="mb-4 p-3 border border-gray-300 rounded-lg">
-                  <p className="font-medium text-gray-700 mb-2">Zugewiesen an:</p>
+                <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
+                  <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Zugewiesen an:</p>
                   {selectedHousehold.memberDetails?.map(member => (
                     <label key={member._id} className="flex items-center gap-2 mb-2 cursor-pointer">
                       <input
@@ -1503,13 +1503,13 @@ export default function HouseholdPlanner() {
                     </label>
                   ))}
                   {newTask.assignedTo.length === 0 && (
-                    <p className="text-sm text-gray-500 italic">Niemand zugewiesen</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">Niemand zugewiesen</p>
                   )}
                 </div>
               )}
 
               {/* Wiederkehrende Aufgabe */}
-              <div className="mb-4 p-3 border border-gray-300 rounded-lg">
+              <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
                 <label className="flex items-center gap-2 mb-2">
                   <input
                     type="checkbox"
@@ -1530,14 +1530,14 @@ export default function HouseholdPlanner() {
                         ...newTask,
                         recurrence: { ...newTask.recurrence, frequency: e.target.value }
                       })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
                     >
                       <option value="daily">Täglich</option>
                       <option value="weekly">Wöchentlich</option>
                       <option value="monthly">Monatlich</option>
                     </select>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">Alle</span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Alle</span>
                       <input
                         type="number"
                         min="1"
@@ -1546,9 +1546,9 @@ export default function HouseholdPlanner() {
                           ...newTask,
                           recurrence: { ...newTask.recurrence, interval: parseInt(e.target.value) || 1 }
                         })}
-                        className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
                       />
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
                         {newTask.recurrence.frequency === 'daily' ? 'Tag(e)' :
                          newTask.recurrence.frequency === 'weekly' ? 'Woche(n)' : 'Monat(e)'}
                       </span>
@@ -1575,7 +1575,7 @@ export default function HouseholdPlanner() {
                       recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
                     });
                   }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
                 >
                   Abbrechen
                 </button>
@@ -1587,19 +1587,19 @@ export default function HouseholdPlanner() {
         {/* Aufgabe bearbeiten Modal */}
         {showEditTask && editingTask && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Aufgabe bearbeiten</h3>
               <input
                 type="text"
                 placeholder="Aufgabentitel"
                 value={editingTask.title}
                 onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
               <select
                 value={editingTask.category}
                 onChange={(e) => setEditingTask({ ...editingTask, category: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               >
                 <option value="">Kategorie wählen</option>
                 {categories.map(cat => (
@@ -1610,11 +1610,11 @@ export default function HouseholdPlanner() {
                 type="datetime-local"
                 value={editingTask.deadline}
                 onChange={(e) => setEditingTask({ ...editingTask, deadline: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
               {selectedHousehold && !selectedHousehold.isPrivate && (
-                <div className="mb-4 p-3 border border-gray-300 rounded-lg">
-                  <p className="font-medium text-gray-700 mb-2">Zugewiesen an:</p>
+                <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
+                  <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Zugewiesen an:</p>
                   {selectedHousehold.memberDetails?.map(member => (
                     <label key={member._id} className="flex items-center gap-2 mb-2 cursor-pointer">
                       <input
@@ -1634,13 +1634,13 @@ export default function HouseholdPlanner() {
                     </label>
                   ))}
                   {(!editingTask.assignedTo || editingTask.assignedTo.length === 0) && (
-                    <p className="text-sm text-gray-500 italic">Niemand zugewiesen</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">Niemand zugewiesen</p>
                   )}
                 </div>
               )}
 
               {/* Wiederkehrende Aufgabe */}
-              <div className="mb-4 p-3 border border-gray-300 rounded-lg">
+              <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
                 <label className="flex items-center gap-2 mb-2">
                   <input
                     type="checkbox"
@@ -1666,14 +1666,14 @@ export default function HouseholdPlanner() {
                         ...editingTask,
                         recurrence: { ...editingTask.recurrence, frequency: e.target.value }
                       })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
                     >
                       <option value="daily">Täglich</option>
                       <option value="weekly">Wöchentlich</option>
                       <option value="monthly">Monatlich</option>
                     </select>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">Alle</span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Alle</span>
                       <input
                         type="number"
                         min="1"
@@ -1682,9 +1682,9 @@ export default function HouseholdPlanner() {
                           ...editingTask,
                           recurrence: { ...editingTask.recurrence, interval: parseInt(e.target.value) || 1 }
                         })}
-                        className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
                       />
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
                         {editingTask.recurrence.frequency === 'daily' ? 'Tag(e)' :
                          editingTask.recurrence.frequency === 'weekly' ? 'Woche(n)' : 'Monat(e)'}
                       </span>
@@ -1705,7 +1705,7 @@ export default function HouseholdPlanner() {
                     setShowEditTask(false);
                     setEditingTask(null);
                   }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
                 >
                   Abbrechen
                 </button>
@@ -1717,12 +1717,12 @@ export default function HouseholdPlanner() {
         {/* Kalenderansicht Modal */}
         {showCalendar && selectedHousehold && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-8">
-            <div className="bg-white rounded-xl p-6 w-full max-w-4xl my-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-4xl my-4">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-800">Kalenderansicht</h3>
+                <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Kalenderansicht</h3>
                 <button
                   onClick={() => setShowCalendar(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700"
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -1788,7 +1788,7 @@ export default function HouseholdPlanner() {
                               return (
                                 <div
                                   key={task._id}
-                                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                                  className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
                                   onClick={() => openEditTask(task)}
                                   style={{ cursor: 'pointer' }}
                                 >
@@ -1797,7 +1797,7 @@ export default function HouseholdPlanner() {
                                     style={{ backgroundColor: category?.color || '#6B7280' }}
                                   />
                                   <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-gray-800">{task.title}</div>
+                                    <div className="font-medium text-gray-800 dark:text-gray-100">{task.title}</div>
                                     <div className="text-sm text-gray-500">
                                       {taskTime}
                                       {category && ` • ${category.name}`}
@@ -1827,9 +1827,9 @@ export default function HouseholdPlanner() {
               Aktive Aufgaben ({activeTasks.length})
             </h2>
             {sortedActiveTasks.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-md p-12 text-center">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
                 <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg">Keine aktiven Aufgaben</p>
+                <p className="text-gray-500 dark:text-gray-400 text-lg">Keine aktiven Aufgaben</p>
                 <p className="text-gray-400 text-sm mt-2">Gut gemacht! 🎉</p>
               </div>
             ) : (
@@ -1856,7 +1856,7 @@ export default function HouseholdPlanner() {
                           className={`mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
                             task.completed
                               ? 'bg-green-500 border-green-500'
-                              : 'border-gray-300 hover:border-green-500'
+                              : 'border-gray-300 dark:border-gray-600 hover:border-green-500'
                           }`}
                         >
                           {task.completed && <Check className="w-4 h-4 text-white" />}
@@ -1939,15 +1939,15 @@ export default function HouseholdPlanner() {
             <div>
               <button
                 onClick={() => setShowCompleted(!showCompleted)}
-                className="flex items-center justify-between w-full text-left mb-4 p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow"
+                className="flex items-center justify-between w-full text-left mb-4 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-shadow"
               >
-                <h2 className="text-xl font-bold text-gray-800">
+                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
                   Erledigte Aufgaben ({completedTasks.length})
                 </h2>
                 {showCompleted ? (
-                  <ChevronUp className="w-6 h-6 text-gray-600" />
+                  <ChevronUp className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                 ) : (
-                  <ChevronDown className="w-6 h-6 text-gray-600" />
+                  <ChevronDown className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                 )}
               </button>
 
@@ -1959,7 +1959,7 @@ export default function HouseholdPlanner() {
                     return (
                       <div
                         key={task._id}
-                        className="bg-white rounded-xl shadow-md p-4 opacity-70 hover:opacity-100 transition-opacity"
+                        className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 opacity-70 hover:opacity-100 transition-opacity"
                       >
                         <div className="flex items-start gap-3">
                           <button
@@ -1983,13 +1983,13 @@ export default function HouseholdPlanner() {
                                 </span>
                               )}
                               {task.completedAt && (
-                                <span className="text-xs text-gray-600">
+                                <span className="text-xs text-gray-600 dark:text-gray-400">
                                   ✅ Erledigt am {formatDate(task.completedAt)}
                                   {task.completedBy && ` von ${getCompletedByName(task.completedBy)}`}
                                 </span>
                               )}
                               {task.deadline && (
-                                <div className="flex items-center gap-1 text-xs text-gray-600">
+                                <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
                                   <Bell className="w-3 h-3" />
                                   <span>
                                     Frist: {formatDate(task.deadline)}
