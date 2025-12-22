@@ -74,7 +74,7 @@ const TaskSchema = new mongoose.Schema({
   title: { type: String, required: true },
   category: { type: String, required: true },
   deadline: Date,
-  assignedTo: { type: String, default: null }, // User ID der zugewiesenen Person
+  assignedTo: { type: [String], default: [] }, // Array von User IDs (Mehrfachzuweisung möglich)
   completed: { type: Boolean, default: false },
   completedAt: Date,
   completedBy: String,
@@ -610,13 +610,17 @@ app.post('/api/tasks', authenticateToken, async (req, res) => {
     }
 
     // 2. Zusätzlich: Wenn Task zugewiesen wurde (und nicht Selbstzuweisung)
-    if (task.assignedTo && task.assignedTo !== req.user.id) {
-      await sendPushNotification(
-        task.assignedTo,
-        'Dir wurde eine Aufgabe zugewiesen',
-        `${creator.name} hat dir "${task.title}" zugewiesen`,
-        { type: 'task_assigned', taskId: task._id.toString(), householdId }
-      );
+    if (task.assignedTo && Array.isArray(task.assignedTo)) {
+      for (const userId of task.assignedTo) {
+        if (userId !== req.user.id) {
+          await sendPushNotification(
+            userId,
+            'Dir wurde eine Aufgabe zugewiesen',
+            `${creator.name} hat dir "${task.title}" zugewiesen`,
+            { type: 'task_assigned', taskId: task._id.toString(), householdId }
+          );
+        }
+      }
     }
 
     res.json(task);
@@ -698,17 +702,24 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
       console.log(`✅ Wiederkehrende Aufgabe erstellt: "${task.title}" (neues Datum: ${nextDeadline})`);
     }
 
-    // Push Notification bei Zuweisung (nur wenn sich assignedTo geändert hat)
-    if (req.body.assignedTo !== undefined &&
-        req.body.assignedTo !== oldAssignedTo &&
-        req.body.assignedTo !== req.user.id) {
-      const assigner = await User.findById(req.user.id);
-      await sendPushNotification(
-        req.body.assignedTo,
-        'Dir wurde eine Aufgabe zugewiesen',
-        `${assigner.name} hat dir "${task.title}" zugewiesen`,
-        { type: 'task_assigned', taskId: task._id.toString(), householdId: task.householdId }
+    // Push Notification bei Zuweisung (nur für neu hinzugefügte User)
+    if (req.body.assignedTo !== undefined && Array.isArray(req.body.assignedTo)) {
+      const oldAssignedSet = new Set(Array.isArray(oldAssignedTo) ? oldAssignedTo : []);
+      const newAssignedUsers = req.body.assignedTo.filter(userId =>
+        !oldAssignedSet.has(userId) && userId !== req.user.id
       );
+
+      if (newAssignedUsers.length > 0) {
+        const assigner = await User.findById(req.user.id);
+        for (const userId of newAssignedUsers) {
+          await sendPushNotification(
+            userId,
+            'Dir wurde eine Aufgabe zugewiesen',
+            `${assigner.name} hat dir "${task.title}" zugewiesen`,
+            { type: 'task_assigned', taskId: task._id.toString(), householdId: task.householdId }
+          );
+        }
+      }
     }
 
     res.json(task);
@@ -778,6 +789,28 @@ app.post('/api/categories', authenticateToken, async (req, res) => {
   }
 });
 
+app.put('/api/categories/:id', authenticateToken, async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    if (!category) return res.status(404).json({ error: 'Kategorie nicht gefunden' });
+
+    // Prüfe Berechtigung
+    const household = await Household.findById(category.householdId);
+    if (!household || !household.members.includes(req.user.id)) {
+      return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+
+    // Aktualisiere Name und Farbe
+    if (req.body.name !== undefined) category.name = req.body.name;
+    if (req.body.color !== undefined) category.color = req.body.color;
+
+    await category.save();
+    res.json(category);
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Aktualisieren der Kategorie' });
+  }
+});
+
 app.delete('/api/categories/:id', authenticateToken, async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
@@ -826,13 +859,15 @@ cron.schedule('*/5 * * * *', async () => {
     });
 
     for (const task of upcomingTasks) {
-      if (task.assignedTo) {
-        await sendPushNotification(
-          task.assignedTo,
-          'Aufgabe wird bald fällig!',
-          `"${task.title}" ist in weniger als 1 Stunde fällig`,
-          { type: 'deadline_soon', taskId: task._id.toString(), householdId: task.householdId }
-        );
+      if (task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0) {
+        for (const userId of task.assignedTo) {
+          await sendPushNotification(
+            userId,
+            'Aufgabe wird bald fällig!',
+            `"${task.title}" ist in weniger als 1 Stunde fällig`,
+            { type: 'deadline_soon', taskId: task._id.toString(), householdId: task.householdId }
+          );
+        }
         task.hourNotified = true;
         await task.save();
       }
@@ -846,13 +881,15 @@ cron.schedule('*/5 * * * *', async () => {
     });
 
     for (const task of overdueTasks) {
-      if (task.assignedTo) {
-        await sendPushNotification(
-          task.assignedTo,
-          'Aufgabe überfällig!',
-          `"${task.title}" ist überfällig`,
-          { type: 'deadline_overdue', taskId: task._id.toString(), householdId: task.householdId }
-        );
+      if (task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0) {
+        for (const userId of task.assignedTo) {
+          await sendPushNotification(
+            userId,
+            'Aufgabe überfällig!',
+            `"${task.title}" ist überfällig`,
+            { type: 'deadline_overdue', taskId: task._id.toString(), householdId: task.householdId }
+          );
+        }
         task.overdueNotified = true;
         await task.save();
       }

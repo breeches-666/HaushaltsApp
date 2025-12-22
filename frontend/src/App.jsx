@@ -30,12 +30,15 @@ export default function HouseholdPlanner() {
   const [showSettings, setShowSettings] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showEditCategory, setShowEditCategory] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [editingCategory, setEditingCategory] = useState(null);
   const [newTask, setNewTask] = useState({
     title: '',
     category: '',
     deadline: '',
-    assignedTo: '',
+    assignedTo: [],
     recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
   });
   const [newCategory, setNewCategory] = useState({ name: '', color: '#3b82f6' });
@@ -56,6 +59,26 @@ export default function HouseholdPlanner() {
       loadInvites(savedToken);
     }
   }, []);
+
+  // Dark Mode aus localStorage laden
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode === 'true') {
+      setDarkMode(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  // Dark Mode in localStorage speichern und auf document anwenden
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('darkMode', 'true');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('darkMode', 'false');
+    }
+  }, [darkMode]);
 
   // Push Notifications Setup
   useEffect(() => {
@@ -555,7 +578,7 @@ export default function HouseholdPlanner() {
         category: newTask.category,
         householdId: selectedHousehold._id,
         deadline: localToUTC(newTask.deadline),
-        assignedTo: newTask.assignedTo || null,
+        assignedTo: newTask.assignedTo,
         recurrence: newTask.recurrence
       };
 
@@ -581,7 +604,7 @@ export default function HouseholdPlanner() {
         title: '',
         category: '',
         deadline: '',
-        assignedTo: '',
+        assignedTo: [],
         recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
       });
       setShowAddTask(false);
@@ -595,6 +618,7 @@ export default function HouseholdPlanner() {
     setEditingTask({
       ...task,
       deadline: utcToLocal(task.deadline),
+      assignedTo: Array.isArray(task.assignedTo) ? task.assignedTo : [],
       recurrence: task.recurrence || { enabled: false, frequency: 'weekly', interval: 1 }
     });
     setShowEditTask(true);
@@ -612,7 +636,7 @@ export default function HouseholdPlanner() {
         title: editingTask.title,
         category: editingTask.category,
         deadline: localToUTC(editingTask.deadline),
-        assignedTo: editingTask.assignedTo || null,
+        assignedTo: editingTask.assignedTo,
         recurrence: editingTask.recurrence
       };
 
@@ -713,6 +737,37 @@ export default function HouseholdPlanner() {
       setShowAddCategory(false);
     } catch (error) {
       alert('Fehler beim Erstellen der Kategorie');
+    }
+  };
+
+  // Kategorie bearbeiten
+  const handleEditCategory = async () => {
+    if (!editingCategory.name) {
+      alert('Bitte Namen angeben!');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/categories/${editingCategory._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: editingCategory.name,
+          color: editingCategory.color
+        }),
+      });
+
+      if (!response.ok) throw new Error('Fehler beim Aktualisieren');
+
+      const updatedCategory = await response.json();
+      setCategories(categories.map(cat => cat._id === updatedCategory._id ? updatedCategory : cat));
+      setEditingCategory(null);
+      setShowEditCategory(false);
+    } catch (error) {
+      alert('Fehler beim Aktualisieren der Kategorie');
     }
   };
 
@@ -1223,15 +1278,48 @@ export default function HouseholdPlanner() {
                             ({tasks.filter(t => t.category === cat._id).length} Aufgaben)
                           </span>
                         </div>
-                        <button
-                          onClick={() => deleteCategory(cat._id)}
-                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingCategory(cat);
+                              setShowEditCategory(true);
+                            }}
+                            className="p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition-colors"
+                          >
+                            <Edit2 className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => deleteCategory(cat._id)}
+                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
+                </div>
+              </div>
+
+              <div className="border-t pt-6 mb-6">
+                <h4 className="text-lg font-semibold text-gray-800 mb-4">Darstellung</h4>
+                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                  <div>
+                    <p className="font-medium text-gray-800">Dark Mode</p>
+                    <p className="text-sm text-gray-500">Dunkles Farbschema aktivieren</p>
+                  </div>
+                  <button
+                    onClick={() => setDarkMode(!darkMode)}
+                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                      darkMode ? 'bg-indigo-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                        darkMode ? 'translate-x-7' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
 
@@ -1272,6 +1360,48 @@ export default function HouseholdPlanner() {
                   onClick={() => {
                     setShowInviteModal(false);
                     setInviteEmail('');
+                  }}
+                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Kategorie bearbeiten Modal */}
+        {showEditCategory && editingCategory && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Kategorie bearbeiten</h3>
+              <input
+                type="text"
+                placeholder="Kategoriename"
+                value={editingCategory.name}
+                onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+              />
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Farbe</label>
+                <input
+                  type="color"
+                  value={editingCategory.color}
+                  onChange={(e) => setEditingCategory({ ...editingCategory, color: e.target.value })}
+                  className="w-full h-12 rounded-lg cursor-pointer"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleEditCategory}
+                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
+                >
+                  Speichern
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEditCategory(false);
+                    setEditingCategory(null);
                   }}
                   className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
                 >
@@ -1353,16 +1483,29 @@ export default function HouseholdPlanner() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
               />
               {selectedHousehold && !selectedHousehold.isPrivate && (
-                <select
-                  value={newTask.assignedTo}
-                  onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
-                >
-                  <option value="">Nicht zugewiesen</option>
+                <div className="mb-4 p-3 border border-gray-300 rounded-lg">
+                  <p className="font-medium text-gray-700 mb-2">Zugewiesen an:</p>
                   {selectedHousehold.memberDetails?.map(member => (
-                    <option key={member._id} value={member._id}>{member.name} ({member.email})</option>
+                    <label key={member._id} className="flex items-center gap-2 mb-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newTask.assignedTo.includes(member._id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewTask({ ...newTask, assignedTo: [...newTask.assignedTo, member._id] });
+                          } else {
+                            setNewTask({ ...newTask, assignedTo: newTask.assignedTo.filter(id => id !== member._id) });
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-gray-700">{member.name} ({member.email})</span>
+                    </label>
                   ))}
-                </select>
+                  {newTask.assignedTo.length === 0 && (
+                    <p className="text-sm text-gray-500 italic">Niemand zugewiesen</p>
+                  )}
+                </div>
               )}
 
               {/* Wiederkehrende Aufgabe */}
@@ -1470,16 +1613,30 @@ export default function HouseholdPlanner() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
               />
               {selectedHousehold && !selectedHousehold.isPrivate && (
-                <select
-                  value={editingTask.assignedTo || ''}
-                  onChange={(e) => setEditingTask({ ...editingTask, assignedTo: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
-                >
-                  <option value="">Nicht zugewiesen</option>
+                <div className="mb-4 p-3 border border-gray-300 rounded-lg">
+                  <p className="font-medium text-gray-700 mb-2">Zugewiesen an:</p>
                   {selectedHousehold.memberDetails?.map(member => (
-                    <option key={member._id} value={member._id}>{member.name} ({member.email})</option>
+                    <label key={member._id} className="flex items-center gap-2 mb-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingTask.assignedTo?.includes(member._id) || false}
+                        onChange={(e) => {
+                          const currentAssigned = editingTask.assignedTo || [];
+                          if (e.target.checked) {
+                            setEditingTask({ ...editingTask, assignedTo: [...currentAssigned, member._id] });
+                          } else {
+                            setEditingTask({ ...editingTask, assignedTo: currentAssigned.filter(id => id !== member._id) });
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-gray-700">{member.name} ({member.email})</span>
+                    </label>
                   ))}
-                </select>
+                  {(!editingTask.assignedTo || editingTask.assignedTo.length === 0) && (
+                    <p className="text-sm text-gray-500 italic">Niemand zugewiesen</p>
+                  )}
+                </div>
               )}
 
               {/* Wiederkehrende Aufgabe */}
@@ -1618,7 +1775,11 @@ export default function HouseholdPlanner() {
                           <div className="space-y-2">
                             {dateTasks.map(task => {
                               const category = categories.find(cat => cat._id === task.category);
-                              const assignedMember = selectedHousehold.memberDetails?.find(m => m._id === task.assignedTo);
+                              const assignedNames = task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0
+                                ? task.assignedTo.map(userId =>
+                                    selectedHousehold.memberDetails?.find(m => m._id === userId)?.name || 'Unbekannt'
+                                  ).join(', ')
+                                : null;
                               const taskTime = new Date(task.deadline).toLocaleTimeString('de-DE', {
                                 hour: '2-digit',
                                 minute: '2-digit'
@@ -1640,7 +1801,7 @@ export default function HouseholdPlanner() {
                                     <div className="text-sm text-gray-500">
                                       {taskTime}
                                       {category && ` • ${category.name}`}
-                                      {assignedMember && ` • ${assignedMember.name}`}
+                                      {assignedNames && ` • ${assignedNames}`}
                                       {task.recurrence?.enabled && ' • 🔄'}
                                     </div>
                                   </div>
@@ -1729,11 +1890,13 @@ export default function HouseholdPlanner() {
                                 </span>
                               </div>
                             )}
-                            {task.assignedTo && selectedHousehold?.memberDetails && (
+                            {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && selectedHousehold?.memberDetails && (
                               <div className="flex items-center gap-1 text-xs text-indigo-600">
-                                <User className="w-3 h-3" />
+                                <Users className="w-3 h-3" />
                                 <span>
-                                  {selectedHousehold.memberDetails.find(m => m._id === task.assignedTo)?.name || 'Unbekannt'}
+                                  {task.assignedTo.map(userId =>
+                                    selectedHousehold.memberDetails.find(m => m._id === userId)?.name || 'Unbekannt'
+                                  ).join(', ')}
                                 </span>
                               </div>
                             )}
@@ -1833,11 +1996,13 @@ export default function HouseholdPlanner() {
                                   </span>
                                 </div>
                               )}
-                              {task.assignedTo && selectedHousehold?.memberDetails && (
+                              {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && selectedHousehold?.memberDetails && (
                                 <div className="flex items-center gap-1 text-xs text-indigo-600">
-                                  <User className="w-3 h-3" />
+                                  <Users className="w-3 h-3" />
                                   <span>
-                                    {selectedHousehold.memberDetails.find(m => m._id === task.assignedTo)?.name || 'Unbekannt'}
+                                    {task.assignedTo.map(userId =>
+                                      selectedHousehold.memberDetails.find(m => m._id === userId)?.name || 'Unbekannt'
+                                    ).join(', ')}
                                   </span>
                                 </div>
                               )}
