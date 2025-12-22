@@ -1266,19 +1266,21 @@ export default function HouseholdPlanner() {
                     categories.map(cat => (
                       <div
                         key={cat._id}
-                        className="flex flex-wrap items-center justify-between gap-3 p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                        className="flex flex-wrap items-center gap-3 p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
                       >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex items-center gap-3 flex-1 min-w-[200px]">
                           <div
                             className="w-6 h-6 rounded flex-shrink-0"
                             style={{ backgroundColor: cat.color }}
                           />
-                          <span className="font-medium text-gray-800 dark:text-gray-100 break-words">{cat.name}</span>
-                          <span className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0 whitespace-nowrap">
-                            ({tasks.filter(t => t.category === cat._id).length} Aufgaben)
-                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-800 dark:text-gray-100 break-words">{cat.name}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                              {tasks.filter(t => t.category === cat._id).length} Aufgaben
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
                           <button
                             onClick={() => {
                               setEditingCategory(cat);
