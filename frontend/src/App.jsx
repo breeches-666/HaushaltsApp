@@ -1825,7 +1825,7 @@ export default function HouseholdPlanner() {
         <div className="space-y-6">
           {/* Aktive Aufgaben */}
           <div>
-            <h2 className="text-xl font-bold text-gray-800 mb-4">
+            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
               Aktive Aufgaben ({activeTasks.length})
             </h2>
             {sortedActiveTasks.length === 0 ? (
@@ -1844,15 +1844,15 @@ export default function HouseholdPlanner() {
                   return (
                     <div
                       key={task._id}
-                      className={`bg-white rounded-xl shadow-md p-4 transition-all ${
-                        isOverdue ? 'border-2 border-red-500 bg-red-50' : ''
+                      className={`bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-all ${
+                        isOverdue ? 'border-2 border-red-500 bg-red-50 dark:bg-red-900/20 dark:border-red-400' : ''
                       }`}
                     >
                       <div className="flex items-start gap-3">
                         {isOverdue && (
                           <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-1 animate-pulse" />
                         )}
-                        
+
                         <button
                           onClick={() => toggleTask(task)}
                           className={`mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
@@ -1865,7 +1865,7 @@ export default function HouseholdPlanner() {
                         </button>
 
                         <div className="flex-1 min-w-0">
-                          <h3 className={`font-medium ${isOverdue ? 'text-red-700 font-bold' : 'text-gray-800'}`}>
+                          <h3 className={`font-medium ${isOverdue ? 'text-red-700 dark:text-red-400 font-bold' : 'text-gray-800 dark:text-gray-100'}`}>
                             {task.title}
                           </h3>
                           <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -1917,13 +1917,13 @@ export default function HouseholdPlanner() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => openEditTask(task)}
-                            className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition-colors"
+                            className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
                           >
                             <Edit2 className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => deleteTask(task._id)}
-                            className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                            className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                           >
                             <Trash2 className="w-5 h-5" />
                           </button>
@@ -1972,7 +1972,7 @@ export default function HouseholdPlanner() {
                           </button>
 
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-gray-800 line-through">
+                            <h3 className="font-medium text-gray-800 dark:text-gray-100 line-through">
                               {task.title}
                             </h3>
                             <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -1999,7 +1999,7 @@ export default function HouseholdPlanner() {
                                 </div>
                               )}
                               {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && selectedHousehold?.memberDetails && (
-                                <div className="flex items-center gap-1 text-xs text-indigo-600">
+                                <div className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400">
                                   <Users className="w-3 h-3" />
                                   <span>
                                     {task.assignedTo.map(userId =>
@@ -2014,13 +2014,13 @@ export default function HouseholdPlanner() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => openEditTask(task)}
-                              className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition-colors"
+                              className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
                             >
                               <Edit2 className="w-5 h-5" />
                             </button>
                             <button
                               onClick={() => deleteTask(task._id)}
-                              className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                              className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                             >
                               <Trash2 className="w-5 h-5" />
                             </button>
