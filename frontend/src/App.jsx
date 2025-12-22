@@ -1266,31 +1266,31 @@ export default function HouseholdPlanner() {
                     categories.map(cat => (
                       <div
                         key={cat._id}
-                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                        className="flex flex-wrap items-center justify-between gap-3 p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div
-                            className="w-6 h-6 rounded"
+                            className="w-6 h-6 rounded flex-shrink-0"
                             style={{ backgroundColor: cat.color }}
                           />
-                          <span className="font-medium text-gray-800 dark:text-gray-100">{cat.name}</span>
-                          <span className="text-sm text-gray-500">
+                          <span className="font-medium text-gray-800 dark:text-gray-100 break-words">{cat.name}</span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0 whitespace-nowrap">
                             ({tasks.filter(t => t.category === cat._id).length} Aufgaben)
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           <button
                             onClick={() => {
                               setEditingCategory(cat);
                               setShowEditCategory(true);
                             }}
-                            className="p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition-colors"
+                            className="p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
                           >
                             <Edit2 className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => deleteCategory(cat._id)}
-                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                           >
                             <Trash2 className="w-5 h-5" />
                           </button>
