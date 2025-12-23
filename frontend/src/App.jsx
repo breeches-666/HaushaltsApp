@@ -1492,53 +1492,15 @@ export default function HouseholdPlanner() {
               {/* Dringlichkeitsstufe */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dringlichkeit</label>
-                <div className="flex gap-2">
-                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 rounded-lg cursor-pointer transition-colors ${
-                    newTask.priority === 'low'
-                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-green-400'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="priority"
-                      value="low"
-                      checked={newTask.priority === 'low'}
-                      onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-medium">Niedrig</span>
-                  </label>
-                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 rounded-lg cursor-pointer transition-colors ${
-                    newTask.priority === 'medium'
-                      ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-yellow-400'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="priority"
-                      value="medium"
-                      checked={newTask.priority === 'medium'}
-                      onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-medium">Mittel</span>
-                  </label>
-                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 rounded-lg cursor-pointer transition-colors ${
-                    newTask.priority === 'high'
-                      ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-red-400'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="priority"
-                      value="high"
-                      checked={newTask.priority === 'high'}
-                      onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-medium">Hoch</span>
-                  </label>
-                </div>
+                <select
+                  value={newTask.priority}
+                  onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                >
+                  <option value="low">Niedrig</option>
+                  <option value="medium">Mittel</option>
+                  <option value="high">Hoch</option>
+                </select>
               </div>
 
               {/* Beschreibung */}
@@ -1548,7 +1510,7 @@ export default function HouseholdPlanner() {
                   value={newTask.description}
                   onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
                   placeholder="Weitere Details zur Aufgabe..."
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg resize-none"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg resize-none"
                   rows="3"
                 />
               </div>
@@ -1689,53 +1651,15 @@ export default function HouseholdPlanner() {
               {/* Dringlichkeitsstufe */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dringlichkeit</label>
-                <div className="flex gap-2">
-                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 rounded-lg cursor-pointer transition-colors ${
-                    (editingTask.priority || 'medium') === 'low'
-                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-green-400'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="editPriority"
-                      value="low"
-                      checked={(editingTask.priority || 'medium') === 'low'}
-                      onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-medium">Niedrig</span>
-                  </label>
-                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 rounded-lg cursor-pointer transition-colors ${
-                    (editingTask.priority || 'medium') === 'medium'
-                      ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-yellow-400'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="editPriority"
-                      value="medium"
-                      checked={(editingTask.priority || 'medium') === 'medium'}
-                      onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-medium">Mittel</span>
-                  </label>
-                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 rounded-lg cursor-pointer transition-colors ${
-                    (editingTask.priority || 'medium') === 'high'
-                      ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-red-400'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="editPriority"
-                      value="high"
-                      checked={(editingTask.priority || 'medium') === 'high'}
-                      onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-medium">Hoch</span>
-                  </label>
-                </div>
+                <select
+                  value={editingTask.priority || 'medium'}
+                  onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                >
+                  <option value="low">Niedrig</option>
+                  <option value="medium">Mittel</option>
+                  <option value="high">Hoch</option>
+                </select>
               </div>
 
               {/* Beschreibung */}
@@ -1745,7 +1669,7 @@ export default function HouseholdPlanner() {
                   value={editingTask.description || ''}
                   onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
                   placeholder="Weitere Details zur Aufgabe..."
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg resize-none"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg resize-none"
                   rows="3"
                 />
               </div>
@@ -1939,9 +1863,9 @@ export default function HouseholdPlanner() {
                                       <div className="font-medium text-gray-800 dark:text-gray-100">{task.title}</div>
                                       {task.priority && (
                                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                          task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                          task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                          'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                          task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' :
+                                          task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100' :
+                                          'bg-yellow-100 text-yellow-700 dark:bg-yellow-600 dark:text-yellow-100'
                                         }`}>
                                           {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
                                         </span>
@@ -1954,7 +1878,7 @@ export default function HouseholdPlanner() {
                                       {task.recurrence?.enabled && ' • 🔄'}
                                     </div>
                                     {task.description && (
-                                      <div className="mt-1 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                                      <div className="mt-1 text-xs text-gray-600 dark:text-gray-300 line-clamp-2">
                                         {task.description}
                                       </div>
                                     )}
@@ -2031,9 +1955,9 @@ export default function HouseholdPlanner() {
                             )}
                             {task.priority && (
                               <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' :
+                                task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100' :
+                                'bg-yellow-100 text-yellow-700 dark:bg-yellow-600 dark:text-yellow-100'
                               }`}>
                                 {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
                               </span>
@@ -2074,7 +1998,7 @@ export default function HouseholdPlanner() {
                             )}
                           </div>
                           {task.description && (
-                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded p-2">
+                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded p-2">
                               {task.description}
                             </div>
                           )}
@@ -2152,9 +2076,9 @@ export default function HouseholdPlanner() {
                               )}
                               {task.priority && (
                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                  task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                  task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                  task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' :
+                                  task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100' :
+                                  'bg-yellow-100 text-yellow-700 dark:bg-yellow-600 dark:text-yellow-100'
                                 }`}>
                                   {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
                                 </span>
@@ -2185,7 +2109,7 @@ export default function HouseholdPlanner() {
                               )}
                             </div>
                             {task.description && (
-                              <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded p-2 line-through">
+                              <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded p-2 line-through">
                                 {task.description}
                               </div>
                             )}
