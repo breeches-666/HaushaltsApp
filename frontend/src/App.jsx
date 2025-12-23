@@ -39,6 +39,8 @@ export default function HouseholdPlanner() {
     category: '',
     deadline: '',
     assignedTo: [],
+    priority: 'medium',
+    description: '',
     recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
   });
   const [newCategory, setNewCategory] = useState({ name: '', color: '#3b82f6' });
@@ -605,6 +607,8 @@ export default function HouseholdPlanner() {
         category: '',
         deadline: '',
         assignedTo: [],
+        priority: 'medium',
+        description: '',
         recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
       });
       setShowAddTask(false);
@@ -1484,6 +1488,71 @@ export default function HouseholdPlanner() {
                 onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
+
+              {/* Dringlichkeitsstufe */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dringlichkeit</label>
+                <div className="flex gap-2">
+                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 rounded-lg cursor-pointer transition-colors ${
+                    newTask.priority === 'low'
+                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-green-400'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="priority"
+                      value="low"
+                      checked={newTask.priority === 'low'}
+                      onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                      className="w-4 h-4"
+                    />
+                    <span className="font-medium">Niedrig</span>
+                  </label>
+                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 rounded-lg cursor-pointer transition-colors ${
+                    newTask.priority === 'medium'
+                      ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-yellow-400'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="priority"
+                      value="medium"
+                      checked={newTask.priority === 'medium'}
+                      onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                      className="w-4 h-4"
+                    />
+                    <span className="font-medium">Mittel</span>
+                  </label>
+                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 rounded-lg cursor-pointer transition-colors ${
+                    newTask.priority === 'high'
+                      ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-red-400'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="priority"
+                      value="high"
+                      checked={newTask.priority === 'high'}
+                      onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                      className="w-4 h-4"
+                    />
+                    <span className="font-medium">Hoch</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Beschreibung */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Beschreibung (optional)</label>
+                <textarea
+                  value={newTask.description}
+                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                  placeholder="Weitere Details zur Aufgabe..."
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg resize-none"
+                  rows="3"
+                />
+              </div>
+
               {selectedHousehold && !selectedHousehold.isPrivate && (
                 <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
                   <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Zugewiesen an:</p>
@@ -1573,7 +1642,9 @@ export default function HouseholdPlanner() {
                       title: '',
                       category: '',
                       deadline: '',
-                      assignedTo: '',
+                      assignedTo: [],
+                      priority: 'medium',
+                      description: '',
                       recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
                     });
                   }}
@@ -1614,6 +1685,71 @@ export default function HouseholdPlanner() {
                 onChange={(e) => setEditingTask({ ...editingTask, deadline: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
+
+              {/* Dringlichkeitsstufe */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dringlichkeit</label>
+                <div className="flex gap-2">
+                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 rounded-lg cursor-pointer transition-colors ${
+                    (editingTask.priority || 'medium') === 'low'
+                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-green-400'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="editPriority"
+                      value="low"
+                      checked={(editingTask.priority || 'medium') === 'low'}
+                      onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
+                      className="w-4 h-4"
+                    />
+                    <span className="font-medium">Niedrig</span>
+                  </label>
+                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 rounded-lg cursor-pointer transition-colors ${
+                    (editingTask.priority || 'medium') === 'medium'
+                      ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-yellow-400'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="editPriority"
+                      value="medium"
+                      checked={(editingTask.priority || 'medium') === 'medium'}
+                      onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
+                      className="w-4 h-4"
+                    />
+                    <span className="font-medium">Mittel</span>
+                  </label>
+                  <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 rounded-lg cursor-pointer transition-colors ${
+                    (editingTask.priority || 'medium') === 'high'
+                      ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-red-400'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="editPriority"
+                      value="high"
+                      checked={(editingTask.priority || 'medium') === 'high'}
+                      onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
+                      className="w-4 h-4"
+                    />
+                    <span className="font-medium">Hoch</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Beschreibung */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Beschreibung (optional)</label>
+                <textarea
+                  value={editingTask.description || ''}
+                  onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                  placeholder="Weitere Details zur Aufgabe..."
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg resize-none"
+                  rows="3"
+                />
+              </div>
+
               {selectedHousehold && !selectedHousehold.isPrivate && (
                 <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
                   <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Zugewiesen an:</p>
@@ -1790,22 +1926,38 @@ export default function HouseholdPlanner() {
                               return (
                                 <div
                                   key={task._id}
-                                  className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+                                  className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                                   onClick={() => openEditTask(task)}
                                   style={{ cursor: 'pointer' }}
                                 >
                                   <div
-                                    className="w-3 h-3 rounded-full flex-shrink-0"
+                                    className="w-3 h-3 rounded-full flex-shrink-0 mt-1.5"
                                     style={{ backgroundColor: category?.color || '#6B7280' }}
                                   />
                                   <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-gray-800 dark:text-gray-100">{task.title}</div>
-                                    <div className="text-sm text-gray-500">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <div className="font-medium text-gray-800 dark:text-gray-100">{task.title}</div>
+                                      {task.priority && (
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                          task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                          task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                          'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                        }`}>
+                                          {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-sm text-gray-500 dark:text-gray-400">
                                       {taskTime}
                                       {category && ` • ${category.name}`}
                                       {assignedNames && ` • ${assignedNames}`}
                                       {task.recurrence?.enabled && ' • 🔄'}
                                     </div>
+                                    {task.description && (
+                                      <div className="mt-1 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                                        {task.description}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -1877,6 +2029,15 @@ export default function HouseholdPlanner() {
                                 {category.name}
                               </span>
                             )}
+                            {task.priority && (
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                              }`}>
+                                {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
+                              </span>
+                            )}
                             {task.deadline && (
                               <div className="flex items-center gap-1 text-xs">
                                 <Bell className={`w-3 h-3 ${
@@ -1912,6 +2073,11 @@ export default function HouseholdPlanner() {
                               </div>
                             )}
                           </div>
+                          {task.description && (
+                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded p-2">
+                              {task.description}
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -1984,6 +2150,15 @@ export default function HouseholdPlanner() {
                                   {category.name}
                                 </span>
                               )}
+                              {task.priority && (
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                  task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                  task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                }`}>
+                                  {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
+                                </span>
+                              )}
                               {task.completedAt && (
                                 <span className="text-xs text-gray-600 dark:text-gray-400">
                                   ✅ Erledigt am {formatDate(task.completedAt)}
@@ -2009,6 +2184,11 @@ export default function HouseholdPlanner() {
                                 </div>
                               )}
                             </div>
+                            {task.description && (
+                              <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded p-2 line-through">
+                                {task.description}
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-2">

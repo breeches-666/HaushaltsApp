@@ -80,6 +80,8 @@ const TaskSchema = new mongoose.Schema({
   completedBy: String,
   hourNotified: { type: Boolean, default: false },
   overdueNotified: { type: Boolean, default: false },
+  priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' }, // Dringlichkeit
+  description: { type: String, default: '' }, // Optionale Beschreibung
   // Wiederkehrende Aufgaben
   recurrence: {
     enabled: { type: Boolean, default: false },
@@ -691,6 +693,8 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
         deadline: nextDeadline,
         assignedTo: task.assignedTo,
         completed: false,
+        priority: task.priority,
+        description: task.description,
         recurrence: {
           enabled: true,
           frequency: task.recurrence.frequency,
