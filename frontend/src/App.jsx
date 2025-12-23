@@ -1830,9 +1830,9 @@ export default function HouseholdPlanner() {
             </h2>
             {sortedActiveTasks.length === 0 ? (
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
-                <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <Calendar className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                 <p className="text-gray-500 dark:text-gray-400 text-lg">Keine aktiven Aufgaben</p>
-                <p className="text-gray-400 text-sm mt-2">Gut gemacht! 🎉</p>
+                <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Gut gemacht! 🎉</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -1881,11 +1881,11 @@ export default function HouseholdPlanner() {
                               <div className="flex items-center gap-1 text-xs">
                                 <Bell className={`w-3 h-3 ${
                                   deadlineStatus === 'overdue' ? 'text-red-500' :
-                                  deadlineStatus === 'soon' ? 'text-orange-500' : 'text-gray-600'
+                                  deadlineStatus === 'soon' ? 'text-orange-500' : 'text-gray-600 dark:text-gray-400'
                                 }`} />
                                 <span className={
                                   deadlineStatus === 'overdue' ? 'text-red-500 font-bold' :
-                                  deadlineStatus === 'soon' ? 'text-orange-500 font-medium' : 'text-gray-600'
+                                  deadlineStatus === 'soon' ? 'text-orange-500 font-medium' : 'text-gray-600 dark:text-gray-400'
                                 }>
                                   {formatDate(task.deadline)}
                                   {isOverdue && ' - ÜBERFÄLLIG!'}
@@ -1893,7 +1893,7 @@ export default function HouseholdPlanner() {
                               </div>
                             )}
                             {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && selectedHousehold?.memberDetails && (
-                              <div className="flex items-center gap-1 text-xs text-indigo-600">
+                              <div className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400">
                                 <Users className="w-3 h-3" />
                                 <span>
                                   {task.assignedTo.map(userId =>
@@ -1903,7 +1903,7 @@ export default function HouseholdPlanner() {
                               </div>
                             )}
                             {task.recurrence?.enabled && (
-                              <div className="flex items-center gap-1 text-xs text-green-600" title="Wiederkehrende Aufgabe">
+                              <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400" title="Wiederkehrende Aufgabe">
                                 <RefreshCw className="w-3 h-3" />
                                 <span>
                                   {task.recurrence.frequency === 'daily' ? 'Täglich' :
