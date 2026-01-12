@@ -816,9 +816,13 @@ export default function HouseholdPlanner() {
 
   // Filter nach Zuweisung
   if (assignmentFilter === 'mine') {
-    filteredTasks = filteredTasks.filter(task => task.assignedTo === currentUser?.id);
+    filteredTasks = filteredTasks.filter(task =>
+      task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.includes(currentUser?.id)
+    );
   } else if (assignmentFilter === 'unassigned') {
-    filteredTasks = filteredTasks.filter(task => !task.assignedTo);
+    filteredTasks = filteredTasks.filter(task =>
+      !task.assignedTo || (Array.isArray(task.assignedTo) && task.assignedTo.length === 0)
+    );
   }
 
   // Trenne aktive und erledigte Aufgaben
@@ -2084,10 +2088,20 @@ export default function HouseholdPlanner() {
                                 </span>
                               )}
                               {task.completedAt && (
-                                <span className="text-xs text-gray-600 dark:text-gray-400">
-                                  ✅ Erledigt am {formatDate(task.completedAt)}
-                                  {task.completedBy && ` von ${getCompletedByName(task.completedBy)}`}
-                                </span>
+                                <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                                  <Check className="w-3 h-3" />
+                                  <span>
+                                    Erledigt am {formatDate(task.completedAt)}
+                                  </span>
+                                </div>
+                              )}
+                              {task.completedBy && (
+                                <div className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400">
+                                  <User className="w-3 h-3" />
+                                  <span>
+                                    Erledigt von {getCompletedByName(task.completedBy)}
+                                  </span>
+                                </div>
                               )}
                               {task.deadline && (
                                 <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
