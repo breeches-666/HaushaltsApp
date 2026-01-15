@@ -53,6 +53,12 @@ export default function HouseholdPlanner() {
   const [archivedTasks, setArchivedTasks] = useState([]);
   const [statistics, setStatistics] = useState([]);
   const [statisticsTimeRange, setStatisticsTimeRange] = useState('all'); // 'all', '7days', '30days'
+  const [notificationPreferences, setNotificationPreferences] = useState({
+    dailyTaskReminder: true,
+    reminderTime: '07:00',
+    deadlineNotifications: true,
+    taskAssignments: true
+  });
 
   // Lade Token aus localStorage
   useEffect(() => {
@@ -64,6 +70,7 @@ export default function HouseholdPlanner() {
       setShowLogin(false);
       loadHouseholds(savedToken);
       loadInvites(savedToken);
+      loadNotificationPreferences(savedToken);
     }
   }, []);
 
@@ -255,6 +262,40 @@ export default function HouseholdPlanner() {
       setStatistics(data);
     } catch (error) {
       console.error('Fehler beim Laden der Statistiken:', error);
+    }
+  };
+
+  // Lade Benachrichtigungseinstellungen
+  const loadNotificationPreferences = async (authToken = token) => {
+    if (!authToken) return;
+    try {
+      const response = await fetch(`${API_URL}/user/notification-preferences`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const data = await response.json();
+      setNotificationPreferences(data);
+    } catch (error) {
+      console.error('Fehler beim Laden der Benachrichtigungseinstellungen:', error);
+    }
+  };
+
+  // Speichere Benachrichtigungseinstellungen
+  const saveNotificationPreferences = async (preferences) => {
+    if (!token) return;
+    try {
+      await fetch(`${API_URL}/user/notification-preferences`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(preferences)
+      });
+      setNotificationPreferences(preferences);
+      alert('Benachrichtigungseinstellungen gespeichert!');
+    } catch (error) {
+      console.error('Fehler beim Speichern der Benachrichtigungseinstellungen:', error);
+      alert('Fehler beim Speichern der Einstellungen');
     }
   };
 
@@ -504,6 +545,7 @@ export default function HouseholdPlanner() {
       setShowLogin(false);
       await loadHouseholds(data.token);
       await loadInvites(data.token);
+      await loadNotificationPreferences(data.token);
       await requestNotificationPermission();
     } catch (error) {
       alert(error.message || 'Login fehlgeschlagen');
@@ -544,6 +586,7 @@ export default function HouseholdPlanner() {
       setShowLogin(false);
       await loadHouseholds(data.token);
       await loadInvites(data.token);
+      await loadNotificationPreferences(data.token);
       await requestNotificationPermission();
     } catch (error) {
       alert(error.message || 'Registrierung fehlgeschlagen');
@@ -1419,8 +1462,107 @@ export default function HouseholdPlanner() {
                 </div>
               </div>
 
+              <div className="border-t pt-6 mb-6">
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                  <Bell className="w-5 h-5" />
+                  Benachrichtigungen
+                </h4>
+                <div className="space-y-4">
+                  {/* Tägliche Aufgaben-Erinnerung */}
+                  <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="font-medium text-gray-800 dark:text-gray-100">Tägliche Erinnerung</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Erhalte eine tägliche Übersicht deiner heutigen Aufgaben</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const newPrefs = { ...notificationPreferences, dailyTaskReminder: !notificationPreferences.dailyTaskReminder };
+                          saveNotificationPreferences(newPrefs);
+                        }}
+                        className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                          notificationPreferences.dailyTaskReminder ? 'bg-indigo-600' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                            notificationPreferences.dailyTaskReminder ? 'translate-x-7' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    {notificationPreferences.dailyTaskReminder && (
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Uhrzeit
+                        </label>
+                        <input
+                          type="time"
+                          value={notificationPreferences.reminderTime}
+                          onChange={(e) => {
+                            const newPrefs = { ...notificationPreferences, reminderTime: e.target.value };
+                            saveNotificationPreferences(newPrefs);
+                          }}
+                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Deadline-Benachrichtigungen */}
+                  <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-800 dark:text-gray-100">Deadline-Erinnerungen</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Benachrichtigungen für anstehende und überfällige Aufgaben</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const newPrefs = { ...notificationPreferences, deadlineNotifications: !notificationPreferences.deadlineNotifications };
+                          saveNotificationPreferences(newPrefs);
+                        }}
+                        className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                          notificationPreferences.deadlineNotifications ? 'bg-indigo-600' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                            notificationPreferences.deadlineNotifications ? 'translate-x-7' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Aufgaben-Zuweisungen */}
+                  <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-800 dark:text-gray-100">Aufgaben-Zuweisungen</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Benachrichtigungen wenn dir eine Aufgabe zugewiesen wird</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const newPrefs = { ...notificationPreferences, taskAssignments: !notificationPreferences.taskAssignments };
+                          saveNotificationPreferences(newPrefs);
+                        }}
+                        className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                          notificationPreferences.taskAssignments ? 'bg-indigo-600' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                            notificationPreferences.taskAssignments ? 'translate-x-7' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="border-t pt-6">
-                <h4 className="text-lg font-semibold text-gray-800 mb-4">Konto</h4>
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Konto</h4>
                 <div className="space-y-2">
                   <p className="text-gray-600 dark:text-gray-400"><strong>Name:</strong> {currentUser?.name}</p>
                   <p className="text-gray-600 dark:text-gray-400"><strong>E-Mail:</strong> {currentUser?.email}</p>

@@ -53,6 +53,12 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   fcmToken: { type: String, default: null }, // Firebase Cloud Messaging Token für Push Notifications
+  notificationPreferences: {
+    dailyTaskReminder: { type: Boolean, default: true }, // Tägliche Erinnerung für heutige Aufgaben
+    reminderTime: { type: String, default: '07:00' }, // Uhrzeit für tägliche Erinnerung (HH:MM)
+    deadlineNotifications: { type: Boolean, default: true }, // Benachrichtigungen für Deadlines
+    taskAssignments: { type: Boolean, default: true } // Benachrichtigungen bei Aufgaben-Zuweisung
+  },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -276,6 +282,47 @@ app.post('/api/user/fcm-token', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('FCM Token Registrierung fehlgeschlagen:', error);
     res.status(500).json({ error: 'FCM Token Registrierung fehlgeschlagen' });
+  }
+});
+
+// Notification Preferences
+app.get('/api/user/notification-preferences', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+    }
+
+    res.json(user.notificationPreferences || {
+      dailyTaskReminder: true,
+      reminderTime: '07:00',
+      deadlineNotifications: true,
+      taskAssignments: true
+    });
+  } catch (error) {
+    console.error('Fehler beim Laden der Benachrichtigungseinstellungen:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Benachrichtigungseinstellungen' });
+  }
+});
+
+app.put('/api/user/notification-preferences', authenticateToken, async (req, res) => {
+  try {
+    const { dailyTaskReminder, reminderTime, deadlineNotifications, taskAssignments } = req.body;
+
+    const updateData = { notificationPreferences: {} };
+
+    if (dailyTaskReminder !== undefined) updateData.notificationPreferences.dailyTaskReminder = dailyTaskReminder;
+    if (reminderTime !== undefined) updateData.notificationPreferences.reminderTime = reminderTime;
+    if (deadlineNotifications !== undefined) updateData.notificationPreferences.deadlineNotifications = deadlineNotifications;
+    if (taskAssignments !== undefined) updateData.notificationPreferences.taskAssignments = taskAssignments;
+
+    await User.findByIdAndUpdate(req.user.id, updateData);
+    console.log(`✅ Benachrichtigungseinstellungen aktualisiert für User ${req.user.id}`);
+
+    res.json({ message: 'Benachrichtigungseinstellungen erfolgreich aktualisiert' });
+  } catch (error) {
+    console.error('Fehler beim Aktualisieren der Benachrichtigungseinstellungen:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren der Benachrichtigungseinstellungen' });
   }
 });
 
@@ -722,12 +769,16 @@ app.post('/api/tasks', authenticateToken, async (req, res) => {
     if (task.assignedTo && Array.isArray(task.assignedTo)) {
       for (const userId of task.assignedTo) {
         if (userId !== req.user.id) {
-          await sendPushNotification(
-            userId,
-            'Dir wurde eine Aufgabe zugewiesen',
-            `${creator.name} hat dir "${task.title}" zugewiesen`,
-            { type: 'task_assigned', taskId: task._id.toString(), householdId }
-          );
+          // Prüfe ob Benutzer Zuweisungs-Benachrichtigungen aktiviert hat
+          const user = await User.findById(userId);
+          if (user && user.notificationPreferences?.taskAssignments !== false) {
+            await sendPushNotification(
+              userId,
+              'Dir wurde eine Aufgabe zugewiesen',
+              `${creator.name} hat dir "${task.title}" zugewiesen`,
+              { type: 'task_assigned', taskId: task._id.toString(), householdId }
+            );
+          }
         }
       }
     }
@@ -823,12 +874,16 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
       if (newAssignedUsers.length > 0) {
         const assigner = await User.findById(req.user.id);
         for (const userId of newAssignedUsers) {
-          await sendPushNotification(
-            userId,
-            'Dir wurde eine Aufgabe zugewiesen',
-            `${assigner.name} hat dir "${task.title}" zugewiesen`,
-            { type: 'task_assigned', taskId: task._id.toString(), householdId: task.householdId }
-          );
+          // Prüfe ob Benutzer Zuweisungs-Benachrichtigungen aktiviert hat
+          const user = await User.findById(userId);
+          if (user && user.notificationPreferences?.taskAssignments !== false) {
+            await sendPushNotification(
+              userId,
+              'Dir wurde eine Aufgabe zugewiesen',
+              `${assigner.name} hat dir "${task.title}" zugewiesen`,
+              { type: 'task_assigned', taskId: task._id.toString(), householdId: task.householdId }
+            );
+          }
         }
       }
     }
@@ -972,12 +1027,16 @@ cron.schedule('*/5 * * * *', async () => {
     for (const task of upcomingTasks) {
       if (task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0) {
         for (const userId of task.assignedTo) {
-          await sendPushNotification(
-            userId,
-            'Aufgabe wird bald fällig!',
-            `"${task.title}" ist in weniger als 1 Stunde fällig`,
-            { type: 'deadline_soon', taskId: task._id.toString(), householdId: task.householdId }
-          );
+          // Prüfe ob Benutzer Deadline-Benachrichtigungen aktiviert hat
+          const user = await User.findById(userId);
+          if (user && user.notificationPreferences?.deadlineNotifications !== false) {
+            await sendPushNotification(
+              userId,
+              'Aufgabe wird bald fällig!',
+              `"${task.title}" ist in weniger als 1 Stunde fällig`,
+              { type: 'deadline_soon', taskId: task._id.toString(), householdId: task.householdId }
+            );
+          }
         }
         task.hourNotified = true;
         await task.save();
@@ -994,12 +1053,16 @@ cron.schedule('*/5 * * * *', async () => {
     for (const task of overdueTasks) {
       if (task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0) {
         for (const userId of task.assignedTo) {
-          await sendPushNotification(
-            userId,
-            'Aufgabe überfällig!',
-            `"${task.title}" ist überfällig`,
-            { type: 'deadline_overdue', taskId: task._id.toString(), householdId: task.householdId }
-          );
+          // Prüfe ob Benutzer Deadline-Benachrichtigungen aktiviert hat
+          const user = await User.findById(userId);
+          if (user && user.notificationPreferences?.deadlineNotifications !== false) {
+            await sendPushNotification(
+              userId,
+              'Aufgabe überfällig!',
+              `"${task.title}" ist überfällig`,
+              { type: 'deadline_overdue', taskId: task._id.toString(), householdId: task.householdId }
+            );
+          }
         }
         task.overdueNotified = true;
         await task.save();
@@ -1011,6 +1074,66 @@ cron.schedule('*/5 * * * *', async () => {
     }
   } catch (error) {
     console.error('❌ Cron Job Fehler:', error);
+  }
+});
+
+// Daily Task Reminder - Prüft jede Minute, ob Benutzer ihre tägliche Erinnerung erhalten sollen
+cron.schedule('* * * * *', async () => {
+  try {
+    const now = new Date();
+    const currentHour = now.getHours().toString().padStart(2, '0');
+    const currentMinute = now.getMinutes().toString().padStart(2, '0');
+    const currentTime = `${currentHour}:${currentMinute}`;
+
+    // Finde alle Benutzer, die zu dieser Uhrzeit eine Erinnerung möchten
+    const users = await User.find({
+      'notificationPreferences.dailyTaskReminder': true,
+      'notificationPreferences.reminderTime': currentTime,
+      fcmToken: { $ne: null }
+    });
+
+    if (users.length === 0) {
+      return; // Keine Benutzer für diese Uhrzeit
+    }
+
+    console.log(`⏰ Tägliche Erinnerung: ${users.length} Benutzer um ${currentTime}`);
+
+    for (const user of users) {
+      try {
+        // Finde alle Haushalte des Benutzers
+        const households = await Household.find({ members: user._id.toString() });
+
+        let totalTodayTasks = 0;
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+        // Zähle alle heutigen Aufgaben über alle Haushalte
+        for (const household of households) {
+          const todayTasks = await Task.countDocuments({
+            householdId: household._id.toString(),
+            completed: false,
+            archived: false,
+            deadline: { $gte: todayStart, $lte: todayEnd }
+          });
+          totalTodayTasks += todayTasks;
+        }
+
+        // Sende Benachrichtigung nur wenn es heutige Aufgaben gibt
+        if (totalTodayTasks > 0) {
+          const taskWord = totalTodayTasks === 1 ? 'Aufgabe' : 'Aufgaben';
+          await sendPushNotification(
+            user._id.toString(),
+            '📋 Heutige Aufgaben',
+            `Du hast ${totalTodayTasks} ${taskWord} für heute`,
+            { type: 'daily_reminder', count: totalTodayTasks.toString() }
+          );
+        }
+      } catch (userError) {
+        console.error(`❌ Fehler bei täglicher Erinnerung für User ${user._id}:`, userError);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Cron Job Fehler (Tägliche Erinnerung):', error);
   }
 });
 
