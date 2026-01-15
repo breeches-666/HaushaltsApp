@@ -48,6 +48,7 @@ export default function HouseholdPlanner() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [assignmentFilter, setAssignmentFilter] = useState('all'); // 'all', 'mine', 'unassigned'
+  const [completedByFilter, setCompletedByFilter] = useState('all'); // 'all' oder userId
   const [viewMode, setViewMode] = useState('tasks'); // 'tasks', 'archive', 'statistics'
   const [archivedTasks, setArchivedTasks] = useState([]);
   const [statistics, setStatistics] = useState([]);
@@ -858,7 +859,12 @@ export default function HouseholdPlanner() {
 
   // Trenne aktive und erledigte Aufgaben
   const activeTasks = filteredTasks.filter(task => !task.completed);
-  const completedTasks = filteredTasks.filter(task => task.completed);
+  let completedTasks = filteredTasks.filter(task => task.completed);
+
+  // Filter erledigte Aufgaben nach completedBy
+  if (completedByFilter !== 'all') {
+    completedTasks = completedTasks.filter(task => task.completedBy === completedByFilter);
+  }
 
   // Sortiere aktive Aufgaben: Überfällig zuerst, dann nach Deadline
   const sortedActiveTasks = [...activeTasks].sort((a, b) => {
@@ -2128,6 +2134,27 @@ export default function HouseholdPlanner() {
               </button>
 
               {showCompleted && (
+                <>
+                  {/* Filter nach "Erledigt von" */}
+                  {selectedHousehold && selectedHousehold.memberDetails && selectedHousehold.memberDetails.length > 1 && (
+                    <div className="mb-4 bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Filter: Erledigt von
+                      </label>
+                      <select
+                        value={completedByFilter}
+                        onChange={(e) => setCompletedByFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                      >
+                        <option value="all">Alle anzeigen</option>
+                        {selectedHousehold.memberDetails.map(member => (
+                          <option key={member._id} value={member._id}>
+                            {member.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 <div className="space-y-3">
                   {completedTasks.map(task => {
                     const category = categories.find(cat => cat._id === task.category);
@@ -2228,6 +2255,7 @@ export default function HouseholdPlanner() {
                     );
                   })}
                 </div>
+                </>
               )}
             </div>
           )}
@@ -2235,23 +2263,52 @@ export default function HouseholdPlanner() {
         )}
 
         {/* Archiv-Ansicht */}
-        {viewMode === 'archive' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-                Archiv ({archivedTasks.length})
-              </h2>
-            </div>
+        {viewMode === 'archive' && (() => {
+          // Filter archivierte Aufgaben nach completedBy
+          const filteredArchivedTasks = completedByFilter !== 'all'
+            ? archivedTasks.filter(task => task.completedBy === completedByFilter)
+            : archivedTasks;
 
-            {archivedTasks.length === 0 ? (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
-                <Archive className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-500 dark:text-gray-400 text-lg">Keine archivierten Aufgaben</p>
-                <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Erledigte Aufgaben werden nach 14 Tagen automatisch archiviert</p>
+          return (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                  Archiv ({filteredArchivedTasks.length})
+                </h2>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {archivedTasks.map(task => {
+
+              {/* Filter nach "Erledigt von" */}
+              {selectedHousehold && selectedHousehold.memberDetails && selectedHousehold.memberDetails.length > 1 && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Filter: Erledigt von
+                  </label>
+                  <select
+                    value={completedByFilter}
+                    onChange={(e) => setCompletedByFilter(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                  >
+                    <option value="all">Alle anzeigen</option>
+                    {selectedHousehold.memberDetails.map(member => (
+                      <option key={member._id} value={member._id}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {filteredArchivedTasks.length === 0 ? (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
+                  <Archive className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400 text-lg">
+                    {completedByFilter !== 'all' ? 'Keine archivierten Aufgaben für diesen Filter' : 'Keine archivierten Aufgaben'}
+                  </p>
+                  <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Erledigte Aufgaben werden nach 14 Tagen automatisch archiviert</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredArchivedTasks.map(task => {
                   const category = categories.find(cat => cat._id === task.category);
 
                   return (
@@ -2313,7 +2370,8 @@ export default function HouseholdPlanner() {
               </div>
             )}
           </div>
-        )}
+        );
+        })()}
 
         {/* Statistik-Ansicht */}
         {viewMode === 'statistics' && (
