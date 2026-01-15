@@ -52,6 +52,7 @@ export default function HouseholdPlanner() {
   const [viewMode, setViewMode] = useState('tasks'); // 'tasks', 'archive', 'statistics'
   const [archivedTasks, setArchivedTasks] = useState([]);
   const [statistics, setStatistics] = useState([]);
+  const [statisticsTimeRange, setStatisticsTimeRange] = useState('all'); // 'all', '7days', '30days'
 
   // Lade Token aus localStorage
   useEffect(() => {
@@ -244,10 +245,10 @@ export default function HouseholdPlanner() {
   };
 
   // Lade Statistiken
-  const loadStatistics = async () => {
+  const loadStatistics = async (timeRange = statisticsTimeRange) => {
     if (!selectedHousehold) return;
     try {
-      const response = await fetch(`${API_URL}/tasks/statistics?householdId=${selectedHousehold._id}`, {
+      const response = await fetch(`${API_URL}/tasks/statistics?householdId=${selectedHousehold._id}&timeRange=${timeRange}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -2382,6 +2383,54 @@ export default function HouseholdPlanner() {
               </h2>
             </div>
 
+            {/* Zeitraum-Auswahl */}
+            <div className="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Zeitraum
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setStatisticsTimeRange('all');
+                    loadStatistics('all');
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                    statisticsTimeRange === 'all'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                  }`}
+                >
+                  Gesamt
+                </button>
+                <button
+                  onClick={() => {
+                    setStatisticsTimeRange('30days');
+                    loadStatistics('30days');
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                    statisticsTimeRange === '30days'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                  }`}
+                >
+                  30 Tage
+                </button>
+                <button
+                  onClick={() => {
+                    setStatisticsTimeRange('7days');
+                    loadStatistics('7days');
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                    statisticsTimeRange === '7days'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                  }`}
+                >
+                  7 Tage
+                </button>
+              </div>
+            </div>
+
             {statistics.length === 0 ? (
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
                 <BarChart className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
@@ -2392,6 +2441,9 @@ export default function HouseholdPlanner() {
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
                   Erledigte Aufgaben pro Person
+                  {statisticsTimeRange === '7days' && ' (Letzte 7 Tage)'}
+                  {statisticsTimeRange === '30days' && ' (Letzte 30 Tage)'}
+                  {statisticsTimeRange === 'all' && ' (Gesamt)'}
                 </h3>
                 <div className="space-y-4">
                   {statistics.map((stat, index) => {

@@ -620,7 +620,7 @@ app.get('/api/tasks/archived', authenticateToken, async (req, res) => {
 // Statistiken: Erledigte Aufgaben pro Person
 app.get('/api/tasks/statistics', authenticateToken, async (req, res) => {
   try {
-    const { householdId } = req.query;
+    const { householdId, timeRange } = req.query; // timeRange: 'all', '7days', '30days'
 
     if (!householdId) {
       return res.status(400).json({ error: 'householdId erforderlich' });
@@ -632,14 +632,28 @@ app.get('/api/tasks/statistics', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Keine Berechtigung' });
     }
 
+    // Berechne Zeitfilter basierend auf timeRange
+    const matchQuery = {
+      householdId,
+      completed: true,
+      completedBy: { $exists: true, $ne: null }
+    };
+
+    if (timeRange === '7days') {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      matchQuery.completedAt = { $gte: sevenDaysAgo };
+    } else if (timeRange === '30days') {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      matchQuery.completedAt = { $gte: thirtyDaysAgo };
+    }
+    // Bei 'all' oder undefined: kein Zeitfilter
+
     // Aggregation: Zähle erledigte Aufgaben pro completedBy
     const stats = await Task.aggregate([
       {
-        $match: {
-          householdId,
-          completed: true,
-          completedBy: { $exists: true, $ne: null }
-        }
+        $match: matchQuery
       },
       {
         $group: {
