@@ -78,6 +78,7 @@ const TaskSchema = new mongoose.Schema({
   completed: { type: Boolean, default: false },
   completedAt: Date,
   completedBy: String,
+  archived: { type: Boolean, default: false }, // Archiviert nach 14 Tagen
   hourNotified: { type: Boolean, default: false },
   overdueNotified: { type: Boolean, default: false },
   priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' }, // Dringlichkeit
@@ -542,7 +543,21 @@ app.get('/api/tasks', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Keine Berechtigung' });
     }
 
-    const tasks = await Task.find({ householdId });
+    // Automatisches Archivieren: Erledigte Aufgaben älter als 14 Tage
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    await Task.updateMany(
+      {
+        householdId,
+        completed: true,
+        completedAt: { $lt: fourteenDaysAgo },
+        archived: false
+      },
+      { $set: { archived: true } }
+    );
+
+    // Gebe nur nicht-archivierte Aufgaben zurück
+    const tasks = await Task.find({ householdId, archived: { $ne: true } });
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ error: 'Fehler beim Laden der Aufgaben' });
@@ -577,6 +592,84 @@ app.get('/api/tasks/calendar', authenticateToken, async (req, res) => {
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ error: 'Fehler beim Laden der Kalender-Aufgaben' });
+  }
+});
+
+// Archivierte Aufgaben abrufen
+app.get('/api/tasks/archived', authenticateToken, async (req, res) => {
+  try {
+    const { householdId } = req.query;
+
+    if (!householdId) {
+      return res.status(400).json({ error: 'householdId erforderlich' });
+    }
+
+    // Prüfe ob User Mitglied ist
+    const household = await Household.findById(householdId);
+    if (!household || !household.members.includes(req.user.id)) {
+      return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+
+    const tasks = await Task.find({ householdId, archived: true }).sort({ completedAt: -1 });
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Laden der archivierten Aufgaben' });
+  }
+});
+
+// Statistiken: Erledigte Aufgaben pro Person
+app.get('/api/tasks/statistics', authenticateToken, async (req, res) => {
+  try {
+    const { householdId } = req.query;
+
+    if (!householdId) {
+      return res.status(400).json({ error: 'householdId erforderlich' });
+    }
+
+    // Prüfe ob User Mitglied ist
+    const household = await Household.findById(householdId);
+    if (!household || !household.members.includes(req.user.id)) {
+      return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+
+    // Aggregation: Zähle erledigte Aufgaben pro completedBy
+    const stats = await Task.aggregate([
+      {
+        $match: {
+          householdId,
+          completed: true,
+          completedBy: { $exists: true, $ne: null }
+        }
+      },
+      {
+        $group: {
+          _id: '$completedBy',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Hole User-Details für die IDs
+    const userIds = stats.map(s => s._id);
+    const users = await User.find({ _id: { $in: userIds } });
+
+    const statistics = stats.map(stat => {
+      const user = users.find(u => u._id.toString() === stat._id);
+      return {
+        userId: stat._id,
+        userName: user ? user.name : 'Unbekannt',
+        userEmail: user ? user.email : '',
+        completedCount: stat.count
+      };
+    });
+
+    // Sortiere nach Anzahl (absteigend)
+    statistics.sort((a, b) => b.completedCount - a.completedCount);
+
+    res.json(statistics);
+  } catch (error) {
+    console.error('Fehler bei Statistik:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Statistiken' });
   }
 });
 

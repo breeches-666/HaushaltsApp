@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home, RefreshCw } from 'lucide-react';
+import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home, RefreshCw, Archive, BarChart, CheckSquare } from 'lucide-react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 
@@ -48,6 +48,9 @@ export default function HouseholdPlanner() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [assignmentFilter, setAssignmentFilter] = useState('all'); // 'all', 'mine', 'unassigned'
+  const [viewMode, setViewMode] = useState('tasks'); // 'tasks', 'archive', 'statistics'
+  const [archivedTasks, setArchivedTasks] = useState([]);
+  const [statistics, setStatistics] = useState([]);
 
   // Lade Token aus localStorage
   useEffect(() => {
@@ -222,6 +225,34 @@ export default function HouseholdPlanner() {
       localStorage.setItem('selectedHousehold', householdId);
     } catch (error) {
       console.error('Fehler beim Laden:', error);
+    }
+  };
+
+  // Lade archivierte Aufgaben
+  const loadArchivedTasks = async () => {
+    if (!selectedHousehold) return;
+    try {
+      const response = await fetch(`${API_URL}/tasks/archived?householdId=${selectedHousehold._id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setArchivedTasks(data);
+    } catch (error) {
+      console.error('Fehler beim Laden der archivierten Aufgaben:', error);
+    }
+  };
+
+  // Lade Statistiken
+  const loadStatistics = async () => {
+    if (!selectedHousehold) return;
+    try {
+      const response = await fetch(`${API_URL}/tasks/statistics?householdId=${selectedHousehold._id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setStatistics(data);
+    } catch (error) {
+      console.error('Fehler beim Laden der Statistiken:', error);
     }
   };
 
@@ -1141,13 +1172,15 @@ export default function HouseholdPlanner() {
             </div>
           )}
 
-          <button
-            onClick={() => setShowAddTask(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            Neue Aufgabe hinzufügen
-          </button>
+          {viewMode === 'tasks' && (
+            <button
+              onClick={() => setShowAddTask(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              Neue Aufgabe hinzufügen
+            </button>
+          )}
           <button
             onClick={() => setShowCalendar(true)}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors mt-3"
@@ -1155,6 +1188,52 @@ export default function HouseholdPlanner() {
             <Calendar className="w-5 h-5" />
             Kalenderansicht
           </button>
+
+          {/* Ansicht-Umschalter */}
+          <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Ansicht</p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setViewMode('tasks')}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === 'tasks'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                }`}
+              >
+                <CheckSquare className="w-4 h-4" />
+                Aufgaben
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode('archive');
+                  loadArchivedTasks();
+                }}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === 'archive'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                }`}
+              >
+                <Archive className="w-4 h-4" />
+                Archiv
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode('statistics');
+                  loadStatistics();
+                }}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === 'statistics'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                }`}
+              >
+                <BarChart className="w-4 h-4" />
+                Statistiken
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Einstellungen Modal */}
@@ -1902,9 +1981,10 @@ export default function HouseholdPlanner() {
         )}
 
         {/* Aufgabenliste */}
-        <div className="space-y-6">
-          {/* Aktive Aufgaben */}
-          <div>
+        {viewMode === 'tasks' && (
+          <div className="space-y-6">
+            {/* Aktive Aufgaben */}
+            <div>
             <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
               Aktive Aufgaben ({activeTasks.length})
             </h2>
@@ -2151,7 +2231,150 @@ export default function HouseholdPlanner() {
               )}
             </div>
           )}
-        </div>
+          </div>
+        )}
+
+        {/* Archiv-Ansicht */}
+        {viewMode === 'archive' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                Archiv ({archivedTasks.length})
+              </h2>
+            </div>
+
+            {archivedTasks.length === 0 ? (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
+                <Archive className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400 text-lg">Keine archivierten Aufgaben</p>
+                <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Erledigte Aufgaben werden nach 14 Tagen automatisch archiviert</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {archivedTasks.map(task => {
+                  const category = categories.find(cat => cat._id === task.category);
+
+                  return (
+                    <div
+                      key={task._id}
+                      className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 opacity-60"
+                    >
+                      <div className="flex items-start gap-3">
+                        <Check className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-800 dark:text-gray-100 line-through">
+                            {task.title}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            {category && (
+                              <span
+                                className="px-3 py-1 rounded-full text-xs font-medium text-white"
+                                style={{ backgroundColor: category.color }}
+                              >
+                                {category.name}
+                              </span>
+                            )}
+                            {task.priority && (
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' :
+                                task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100' :
+                                'bg-yellow-100 text-yellow-700 dark:bg-yellow-600 dark:text-yellow-100'
+                              }`}>
+                                {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
+                              </span>
+                            )}
+                            {task.completedAt && (
+                              <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                                <Check className="w-3 h-3" />
+                                <span>
+                                  Erledigt am {formatDate(task.completedAt)}
+                                </span>
+                              </div>
+                            )}
+                            {task.completedBy && (
+                              <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                                <User className="w-3 h-3" />
+                                <span>
+                                  von {getCompletedByName(task.completedBy)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {task.description && (
+                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded p-2 line-through">
+                              {task.description}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Statistik-Ansicht */}
+        {viewMode === 'statistics' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                Statistiken
+              </h2>
+            </div>
+
+            {statistics.length === 0 ? (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
+                <BarChart className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400 text-lg">Keine Statistiken verfügbar</p>
+                <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Erledigt Aufgaben, um Statistiken zu sehen</p>
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
+                  Erledigte Aufgaben pro Person
+                </h3>
+                <div className="space-y-4">
+                  {statistics.map((stat, index) => {
+                    const maxCount = Math.max(...statistics.map(s => s.completedCount));
+                    const percentage = (stat.completedCount / maxCount) * 100;
+
+                    return (
+                      <div key={stat.userId} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${
+                              index === 0 ? 'bg-yellow-500' :
+                              index === 1 ? 'bg-gray-400' :
+                              index === 2 ? 'bg-orange-600' : 'bg-indigo-500'
+                            }`}>
+                              {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-800 dark:text-gray-100">{stat.userName}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{stat.userEmail}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{stat.completedCount}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Aufgaben</p>
+                          </div>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                          <div
+                            className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
