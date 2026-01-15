@@ -1,6 +1,34 @@
 # Android Widget Implementation Guide
 
-## Überblick
+## ✅ IMPLEMENTIERT: Push-Benachrichtigungen für tägliche Aufgaben
+
+Als Alternative zum nativen Android Widget wurde ein **Push-Benachrichtigungssystem** implementiert:
+
+### Features:
+- 📱 **Tägliche Erinnerung**: Benutzer erhalten täglich eine Benachrichtigung mit der Anzahl ihrer heutigen Aufgaben
+- ⏰ **Konfigurierbare Uhrzeit**: In den Einstellungen kann jeder Benutzer seine bevorzugte Erinnerungszeit festlegen
+- 🔔 **Umfangreiche Einstellungen**: Separate Toggles für verschiedene Benachrichtigungstypen
+  - Tägliche Aufgaben-Erinnerung
+  - Deadline-Benachrichtigungen (1 Stunde vorher, überfällig)
+  - Aufgaben-Zuweisungen
+
+### Vorteile gegenüber nativem Widget:
+- ✅ Keine Android Studio Installation nötig
+- ✅ Sofort einsatzbereit (nutzt existierende Firebase Cloud Messaging Infrastruktur)
+- ✅ Funktioniert auf allen Plattformen (iOS, Android)
+- ✅ Benutzer werden aktiv benachrichtigt (kein passives Widget)
+- ✅ Einfachere Wartung und Updates
+
+### Nutzung:
+1. App öffnen und einloggen
+2. Einstellungen öffnen (⚙️ Icon)
+3. Unter "Benachrichtigungen" die gewünschten Optionen aktivieren
+4. Tägliche Erinnerung aktivieren und Uhrzeit wählen (Standard: 07:00)
+
+---
+
+## Alternative: Native Android Widget (nicht implementiert)
+
 Dieses Dokument beschreibt die Implementierung eines Android Widgets für die Haushaltsplaner-App, das die heutigen Aufgaben anzeigt und das Abhaken ermöglicht.
 
 ## Voraussetzungen
