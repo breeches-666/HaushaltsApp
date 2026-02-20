@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core';
 
 // Backend API URL - Für lokale Entwicklung
 const API_URL = 'https://backend.app.mr-dk.de/api';
+const FRONTEND_URL = 'https://app.mr-dk.de';
 
 export default function HouseholdPlanner() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -2040,14 +2041,14 @@ export default function HouseholdPlanner() {
                       </p>
                       <div className="flex flex-col items-center gap-4 mb-4">
                         <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}?terminal=${selectedHousehold.terminalToken}`)}`}
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${FRONTEND_URL}?terminal=${selectedHousehold.terminalToken}`)}`}
                           alt="Terminal QR-Code"
                           className="w-48 h-48 rounded-lg border border-gray-200 dark:border-gray-600"
                         />
                         <div className="w-full flex gap-2">
                           <button
                             onClick={() => {
-                              navigator.clipboard.writeText(`${window.location.origin}?terminal=${selectedHousehold.terminalToken}`);
+                              navigator.clipboard.writeText(`${FRONTEND_URL}?terminal=${selectedHousehold.terminalToken}`);
                               alert('Link kopiert!');
                             }}
                             className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
