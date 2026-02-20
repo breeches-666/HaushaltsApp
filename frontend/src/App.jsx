@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core';
 
 // Backend API URL - Für lokale Entwicklung
 const API_URL = 'https://backend.app.mr-dk.de/api';
-const FRONTEND_URL = 'https://app.mr-dk.de';
+const FRONTEND_URL = 'https://backend.app.mr-dk.de';
 
 export default function HouseholdPlanner() {
   const [currentUser, setCurrentUser] = useState(null);
