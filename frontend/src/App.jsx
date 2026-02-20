@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home } from 'lucide-react';
+import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home, RefreshCw, Archive, BarChart, CheckSquare } from 'lucide-react';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 
 // Backend API URL - Für lokale Entwicklung
 const API_URL = 'https://backend.app.mr-dk.de/api';
@@ -15,6 +17,7 @@ export default function HouseholdPlanner() {
   const [registerName, setRegisterName] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [households, setHouseholds] = useState([]);
   const [selectedHousehold, setSelectedHousehold] = useState(null);
@@ -26,12 +29,36 @@ export default function HouseholdPlanner() {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [showEditCategory, setShowEditCategory] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
-  const [newTask, setNewTask] = useState({ title: '', category: '', deadline: '' });
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [newTask, setNewTask] = useState({
+    title: '',
+    category: '',
+    deadline: '',
+    assignedTo: [],
+    priority: 'medium',
+    description: '',
+    recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
+  });
   const [newCategory, setNewCategory] = useState({ name: '', color: '#3b82f6' });
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showCompleted, setShowCompleted] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [assignmentFilter, setAssignmentFilter] = useState('all'); // 'all', 'mine', 'unassigned'
+  const [completedByFilter, setCompletedByFilter] = useState('all'); // 'all' oder userId
+  const [viewMode, setViewMode] = useState('tasks'); // 'tasks', 'archive', 'statistics'
+  const [archivedTasks, setArchivedTasks] = useState([]);
+  const [statistics, setStatistics] = useState([]);
+  const [statisticsTimeRange, setStatisticsTimeRange] = useState('all'); // 'all', '7days', '30days'
+  const [notificationPreferences, setNotificationPreferences] = useState({
+    dailyTaskReminder: true,
+    reminderTime: '07:00',
+    deadlineNotifications: true,
+    taskAssignments: true
+  });
 
   // Lade Token aus localStorage
   useEffect(() => {
@@ -43,8 +70,111 @@ export default function HouseholdPlanner() {
       setShowLogin(false);
       loadHouseholds(savedToken);
       loadInvites(savedToken);
+      loadNotificationPreferences(savedToken);
     }
   }, []);
+
+  // Dark Mode aus localStorage laden
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode === 'true') {
+      setDarkMode(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  // Dark Mode in localStorage speichern und auf document anwenden
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('darkMode', 'true');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('darkMode', 'false');
+    }
+  }, [darkMode]);
+
+  // Push Notifications Setup
+  useEffect(() => {
+    const initPushNotifications = async () => {
+      // Nur auf nativen Plattformen (Android/iOS)
+      if (!Capacitor.isNativePlatform()) {
+        console.log('Push Notifications nur auf nativen Plattformen verfügbar');
+        return;
+      }
+
+      if (!token) {
+        return; // Warte bis User eingeloggt ist
+      }
+
+      try {
+        // Prüfe Permission Status
+        let permStatus = await PushNotifications.checkPermissions();
+
+        if (permStatus.receive === 'prompt') {
+          // Frage nach Permission
+          permStatus = await PushNotifications.requestPermissions();
+        }
+
+        if (permStatus.receive !== 'granted') {
+          console.log('Push Notification Permission verweigert');
+          return;
+        }
+
+        // Registriere für Push Notifications
+        await PushNotifications.register();
+
+        // Listener für erfolgreiche Registrierung
+        await PushNotifications.addListener('registration', async (tokenData) => {
+          console.log('✅ FCM Token erhalten:', tokenData.value);
+
+          // Sende Token an Backend
+          try {
+            await fetch(`${API_URL}/user/fcm-token`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ fcmToken: tokenData.value })
+            });
+            console.log('✅ FCM Token an Backend gesendet');
+          } catch (error) {
+            console.error('❌ Fehler beim Senden des FCM Tokens:', error);
+          }
+        });
+
+        // Listener für Registrierungs-Fehler
+        await PushNotifications.addListener('registrationError', (error) => {
+          console.error('❌ Push Notification Registrierung fehlgeschlagen:', error);
+        });
+
+        // Listener für empfangene Notifications (App im Vordergrund)
+        await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          console.log('📬 Push Notification empfangen:', notification);
+          // Zeige Notification im Frontend (optional)
+        });
+
+        // Listener für geklickte Notifications
+        await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+          console.log('🔔 Notification geklickt:', notification);
+          // Navigation basierend auf notification.data möglich
+        });
+
+      } catch (error) {
+        console.error('❌ Push Notification Setup fehlgeschlagen:', error);
+      }
+    };
+
+    initPushNotifications();
+
+    // Cleanup
+    return () => {
+      if (Capacitor.isNativePlatform()) {
+        PushNotifications.removeAllListeners();
+      }
+    };
+  }, [token]);
 
   // Lade Haushalte
   const loadHouseholds = async (authToken) => {
@@ -92,6 +222,13 @@ export default function HouseholdPlanner() {
         }).then(r => r.json())
       ]);
 
+      console.log('📥 Geladene Tasks vom Backend:', tasksData.length, 'Tasks');
+      const tasksWithAssignment = tasksData.filter(t => t.assignedTo);
+      console.log('   - Tasks mit Zuweisung:', tasksWithAssignment.length);
+      if (tasksWithAssignment.length > 0) {
+        console.log('   - Beispiel:', tasksWithAssignment[0].title, '→', tasksWithAssignment[0].assignedTo);
+      }
+
       setTasks(tasksData);
       setCategories(categoriesData);
       localStorage.setItem('selectedHousehold', householdId);
@@ -99,6 +236,94 @@ export default function HouseholdPlanner() {
       console.error('Fehler beim Laden:', error);
     }
   };
+
+  // Lade archivierte Aufgaben
+  const loadArchivedTasks = async () => {
+    if (!selectedHousehold) return;
+    try {
+      const response = await fetch(`${API_URL}/tasks/archived?householdId=${selectedHousehold._id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setArchivedTasks(data);
+    } catch (error) {
+      console.error('Fehler beim Laden der archivierten Aufgaben:', error);
+    }
+  };
+
+  // Lade Statistiken
+  const loadStatistics = async (timeRange = statisticsTimeRange) => {
+    if (!selectedHousehold) return;
+    try {
+      const response = await fetch(`${API_URL}/tasks/statistics?householdId=${selectedHousehold._id}&timeRange=${timeRange}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setStatistics(data);
+    } catch (error) {
+      console.error('Fehler beim Laden der Statistiken:', error);
+    }
+  };
+
+  // Lade Benachrichtigungseinstellungen
+  const loadNotificationPreferences = async (authToken = token) => {
+    if (!authToken) return;
+    try {
+      const response = await fetch(`${API_URL}/user/notification-preferences`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const data = await response.json();
+      setNotificationPreferences(data);
+    } catch (error) {
+      console.error('Fehler beim Laden der Benachrichtigungseinstellungen:', error);
+    }
+  };
+
+  // Speichere Benachrichtigungseinstellungen
+  const saveNotificationPreferences = async (preferences) => {
+    if (!token) return;
+    try {
+      await fetch(`${API_URL}/user/notification-preferences`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(preferences)
+      });
+      setNotificationPreferences(preferences);
+      alert('Benachrichtigungseinstellungen gespeichert!');
+    } catch (error) {
+      console.error('Fehler beim Speichern der Benachrichtigungseinstellungen:', error);
+      alert('Fehler beim Speichern der Einstellungen');
+    }
+  };
+
+  // Manuelle Aktualisierung
+  const refreshData = async () => {
+    if (!selectedHousehold || !token) return;
+
+    setIsRefreshing(true);
+    try {
+      await loadHouseholdData(selectedHousehold._id, token);
+      await loadHouseholds(token);
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren:', error);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500); // Kurzes Feedback
+    }
+  };
+
+  // Auto-Refresh alle 10 Sekunden
+  useEffect(() => {
+    if (!selectedHousehold || !token) return;
+
+    const intervalId = setInterval(() => {
+      loadHouseholdData(selectedHousehold._id, token);
+    }, 10000); // 10 Sekunden
+
+    return () => clearInterval(intervalId);
+  }, [selectedHousehold, token]);
 
   // Haushalt wechseln
   const switchHousehold = (household) => {
@@ -211,6 +436,47 @@ export default function HouseholdPlanner() {
     }
   };
 
+  // Haushalt löschen
+  const deleteHousehold = async () => {
+    if (!confirm(`Möchtest du den Haushalt "${selectedHousehold.name}" wirklich dauerhaft löschen? Alle Aufgaben und Kategorien werden ebenfalls gelöscht. Dies kann nicht rückgängig gemacht werden!`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/households/${selectedHousehold._id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        alert(data.error || 'Fehler beim Löschen des Haushalts');
+        return;
+      }
+
+      // Schließe Einstellungen
+      setShowSettings(false);
+
+      // Lade Haushalte neu
+      await loadHouseholds(token);
+
+      // Wähle ersten verfügbaren Haushalt aus
+      const updatedHouseholds = await fetch(`${API_URL}/households`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).then(r => r.json());
+
+      if (updatedHouseholds.length > 0) {
+        setSelectedHousehold(updatedHouseholds[0]);
+        await loadHouseholdData(updatedHouseholds[0]._id, token);
+      }
+
+      alert('Haushalt erfolgreich gelöscht');
+    } catch (error) {
+      console.error('Fehler beim Löschen:', error);
+      alert('Fehler beim Löschen des Haushalts');
+    }
+  };
+
   // Benachrichtigungen aktivieren
   const requestNotificationPermission = async () => {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -279,6 +545,7 @@ export default function HouseholdPlanner() {
       setShowLogin(false);
       await loadHouseholds(data.token);
       await loadInvites(data.token);
+      await loadNotificationPreferences(data.token);
       await requestNotificationPermission();
     } catch (error) {
       alert(error.message || 'Login fehlgeschlagen');
@@ -319,6 +586,7 @@ export default function HouseholdPlanner() {
       setShowLogin(false);
       await loadHouseholds(data.token);
       await loadInvites(data.token);
+      await loadNotificationPreferences(data.token);
       await requestNotificationPermission();
     } catch (error) {
       alert(error.message || 'Registrierung fehlgeschlagen');
@@ -340,41 +608,38 @@ export default function HouseholdPlanner() {
     setHouseholds([]);
   };
 
-  // Hilfsfunktion: datetime-local zu UTC ohne Zeitverschiebung
+  // Hilfsfunktion: datetime-local zu ISO String (mit korrekter Zeitzone)
   const localToUTC = (datetimeLocal) => {
     if (!datetimeLocal) return null;
-    // Splitte "2024-12-19T09:00" in Komponenten
-    const [date, time] = datetimeLocal.split('T');
-    const [year, month, day] = date.split('-');
-    const [hours, minutes] = time.split(':');
-    // Erstelle UTC Date OHNE Zeitverschiebung
-    const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-    return utcDate.toISOString();
+    // datetime-local Format: "2024-01-15T10:00"
+    // new Date interpretiert das als lokale Zeit und konvertiert korrekt zu UTC
+    const date = new Date(datetimeLocal);
+    return date.toISOString();
   };
 
-  // Hilfsfunktion: UTC zu datetime-local ohne Zeitverschiebung
+  // Hilfsfunktion: ISO String zu datetime-local Format (mit korrekter Zeitzone)
   const utcToLocal = (isoString) => {
     if (!isoString) return '';
     const date = new Date(isoString);
-    // Extrahiere UTC Komponenten (NICHT lokale!)
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    // datetime-local benötigt Format: "2024-01-15T10:00" in lokaler Zeit
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
-  // Hilfsfunktion: Formatiere Datum für Anzeige ohne Zeitverschiebung
+  // Hilfsfunktion: Formatiere Datum für Anzeige
   const formatDate = (isoString) => {
     if (!isoString) return '';
     const date = new Date(isoString);
-    // Nutze UTC Komponenten für Anzeige
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const year = date.getUTCFullYear();
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    // Nutze lokale Zeit für Anzeige
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${day}.${month}.${year} ${hours}:${minutes}`;
   };
 
@@ -390,8 +655,12 @@ export default function HouseholdPlanner() {
         title: newTask.title,
         category: newTask.category,
         householdId: selectedHousehold._id,
-        deadline: localToUTC(newTask.deadline)
+        deadline: localToUTC(newTask.deadline),
+        assignedTo: newTask.assignedTo,
+        recurrence: newTask.recurrence
       };
+
+      console.log('📤 Sende neue Task mit assignedTo:', taskData.assignedTo);
 
       const response = await fetch(`${API_URL}/tasks`, {
         method: 'POST',
@@ -405,8 +674,19 @@ export default function HouseholdPlanner() {
       if (!response.ok) throw new Error('Fehler beim Erstellen');
 
       const task = await response.json();
+      console.log('📥 Empfangene Task vom Backend:', task);
+      console.log('   - assignedTo:', task.assignedTo);
+
       setTasks([...tasks, task]);
-      setNewTask({ title: '', category: '', deadline: '' });
+      setNewTask({
+        title: '',
+        category: '',
+        deadline: '',
+        assignedTo: [],
+        priority: 'medium',
+        description: '',
+        recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
+      });
       setShowAddTask(false);
     } catch (error) {
       alert('Fehler beim Erstellen der Aufgabe');
@@ -417,7 +697,9 @@ export default function HouseholdPlanner() {
   const openEditTask = (task) => {
     setEditingTask({
       ...task,
-      deadline: utcToLocal(task.deadline)
+      deadline: utcToLocal(task.deadline),
+      assignedTo: Array.isArray(task.assignedTo) ? task.assignedTo : [],
+      recurrence: task.recurrence || { enabled: false, frequency: 'weekly', interval: 1 }
     });
     setShowEditTask(true);
   };
@@ -433,8 +715,12 @@ export default function HouseholdPlanner() {
       const updates = {
         title: editingTask.title,
         category: editingTask.category,
-        deadline: localToUTC(editingTask.deadline)
+        deadline: localToUTC(editingTask.deadline),
+        assignedTo: editingTask.assignedTo,
+        recurrence: editingTask.recurrence
       };
+
+      console.log('📤 Update Task mit assignedTo:', updates.assignedTo);
 
       const response = await fetch(`${API_URL}/tasks/${editingTask._id}`, {
         method: 'PUT',
@@ -448,6 +734,9 @@ export default function HouseholdPlanner() {
       if (!response.ok) throw new Error('Fehler beim Aktualisieren');
 
       const updatedTask = await response.json();
+      console.log('📥 Empfangene aktualisierte Task:', updatedTask);
+      console.log('   - assignedTo:', updatedTask.assignedTo);
+
       setTasks(tasks.map(t => t._id === updatedTask._id ? updatedTask : t));
       setShowEditTask(false);
       setEditingTask(null);
@@ -531,6 +820,37 @@ export default function HouseholdPlanner() {
     }
   };
 
+  // Kategorie bearbeiten
+  const handleEditCategory = async () => {
+    if (!editingCategory.name) {
+      alert('Bitte Namen angeben!');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/categories/${editingCategory._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: editingCategory.name,
+          color: editingCategory.color
+        }),
+      });
+
+      if (!response.ok) throw new Error('Fehler beim Aktualisieren');
+
+      const updatedCategory = await response.json();
+      setCategories(categories.map(cat => cat._id === updatedCategory._id ? updatedCategory : cat));
+      setEditingCategory(null);
+      setShowEditCategory(false);
+    } catch (error) {
+      alert('Fehler beim Aktualisieren der Kategorie');
+    }
+  };
+
   // Kategorie löschen
   const deleteCategory = async (categoryId) => {
     if (!confirm('Möchtest du diese Kategorie wirklich löschen?')) return;
@@ -566,13 +886,29 @@ export default function HouseholdPlanner() {
   };
 
   // Gefilterte und sortierte Aufgaben
-  const filteredTasks = selectedCategory === 'all' 
-    ? tasks 
+  let filteredTasks = selectedCategory === 'all'
+    ? tasks
     : tasks.filter(task => task.category === selectedCategory);
+
+  // Filter nach Zuweisung
+  if (assignmentFilter === 'mine') {
+    filteredTasks = filteredTasks.filter(task =>
+      task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.includes(currentUser?.id)
+    );
+  } else if (assignmentFilter === 'unassigned') {
+    filteredTasks = filteredTasks.filter(task =>
+      !task.assignedTo || (Array.isArray(task.assignedTo) && task.assignedTo.length === 0)
+    );
+  }
 
   // Trenne aktive und erledigte Aufgaben
   const activeTasks = filteredTasks.filter(task => !task.completed);
-  const completedTasks = filteredTasks.filter(task => task.completed);
+  let completedTasks = filteredTasks.filter(task => task.completed);
+
+  // Filter erledigte Aufgaben nach completedBy
+  if (completedByFilter !== 'all') {
+    completedTasks = completedTasks.filter(task => task.completedBy === completedByFilter);
+  }
 
   // Sortiere aktive Aufgaben: Überfällig zuerst, dann nach Deadline
   const sortedActiveTasks = [...activeTasks].sort((a, b) => {
@@ -601,12 +937,12 @@ export default function HouseholdPlanner() {
   if (showLogin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-8">
             <div className="inline-block p-3 bg-indigo-100 rounded-full mb-4">
               <User className="w-8 h-8 text-indigo-600" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-800">Haushaltsplaner</h1>
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Haushaltsplaner</h1>
             <p className="text-gray-600 mt-2">
               {isRegistering ? 'Neues Konto erstellen' : 'Willkommen zurück'}
             </p>
@@ -619,7 +955,7 @@ export default function HouseholdPlanner() {
                 placeholder="E-Mail"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <input
                 type="password"
@@ -627,7 +963,7 @@ export default function HouseholdPlanner() {
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <button
                 onClick={handleLogin}
@@ -650,14 +986,14 @@ export default function HouseholdPlanner() {
                 placeholder="Name"
                 value={registerName}
                 onChange={(e) => setRegisterName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <input
                 type="email"
                 placeholder="E-Mail"
                 value={registerEmail}
                 onChange={(e) => setRegisterEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <input
                 type="password"
@@ -665,7 +1001,7 @@ export default function HouseholdPlanner() {
                 value={registerPassword}
                 onChange={(e) => setRegisterPassword(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <button
                 onClick={handleRegister}
@@ -691,30 +1027,42 @@ export default function HouseholdPlanner() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="text-center">
-          <p className="text-gray-600">Lade Haushalt...</p>
+          <p className="text-gray-600 dark:text-gray-400">Lade Haushalt...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="bg-white shadow-md">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 shadow-md">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-100 rounded-lg">
-                <Calendar className="w-6 h-6 text-indigo-600" />
+              <div className="p-2 bg-indigo-100 dark:bg-indigo-900 rounded-lg">
+                <Calendar className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-800">{selectedHousehold.name}</h1>
-                <p className="text-sm text-gray-600">Hallo, {currentUser?.name}!</p>
+                <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">{selectedHousehold.name}</h1>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Hallo, {currentUser?.name}!</p>
               </div>
+              <button
+                onClick={refreshData}
+                disabled={isRefreshing}
+                className={`p-2 rounded-lg transition-all ${
+                  isRefreshing
+                    ? 'text-indigo-600 dark:text-indigo-400 animate-spin'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30'
+                }`}
+                title="Aktualisieren (automatisch alle 10 Sek.)"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
             </div>
             <div className="flex items-center gap-2">
               {pendingInvites.length > 0 && (
                 <div className="relative">
-                  <Mail className="w-6 h-6 text-indigo-600" />
+                  <Mail className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                   <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                     {pendingInvites.length}
                   </span>
@@ -755,7 +1103,7 @@ export default function HouseholdPlanner() {
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
                     selectedHousehold._id === h._id
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
                   }`}
                 >
                   <Home className="w-4 h-4" />
@@ -778,8 +1126,8 @@ export default function HouseholdPlanner() {
                 📨 Du hast {pendingInvites.length} neue Einladung(en)
               </p>
               {pendingInvites.map(invite => (
-                <div key={invite.householdId} className="flex items-center justify-between bg-white rounded p-3 mb-2">
-                  <span className="text-gray-800">{invite.householdName}</span>
+                <div key={invite.householdId} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded p-3 mb-2">
+                  <span className="text-gray-800 dark:text-gray-100">{invite.householdName}</span>
                   <div className="flex gap-2">
                     <button
                       onClick={() => acceptInvite(invite.householdId)}
@@ -802,9 +1150,9 @@ export default function HouseholdPlanner() {
       </div>
 
       <div className="max-w-6xl mx-auto p-4">
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-800">Kategorien</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Kategorien</h2>
           </div>
 
           <div className="flex flex-wrap gap-2 mb-4">
@@ -813,7 +1161,7 @@ export default function HouseholdPlanner() {
               className={`px-4 py-2 rounded-lg transition-colors ${
                 selectedCategory === 'all'
                   ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
               }`}
             >
               Alle ({tasks.length})
@@ -825,7 +1173,7 @@ export default function HouseholdPlanner() {
                 className={`px-4 py-2 rounded-lg transition-colors ${
                   selectedCategory === cat._id
                     ? 'text-white'
-                    : 'text-gray-700 hover:opacity-80'
+                    : 'text-gray-700 dark:text-gray-300 hover:opacity-80'
                 }`}
                 style={{
                   backgroundColor: selectedCategory === cat._id ? cat.color : `${cat.color}40`
@@ -836,24 +1184,117 @@ export default function HouseholdPlanner() {
             ))}
           </div>
 
+          {selectedHousehold && !selectedHousehold.isPrivate && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Zuweisung</h3>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setAssignmentFilter('all')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    assignmentFilter === 'all'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                  }`}
+                >
+                  Alle
+                </button>
+                <button
+                  onClick={() => setAssignmentFilter('mine')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    assignmentFilter === 'mine'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                  }`}
+                >
+                  Meine Aufgaben
+                </button>
+                <button
+                  onClick={() => setAssignmentFilter('unassigned')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    assignmentFilter === 'unassigned'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                  }`}
+                >
+                  Nicht zugewiesen
+                </button>
+              </div>
+            </div>
+          )}
+
+          {viewMode === 'tasks' && (
+            <button
+              onClick={() => setShowAddTask(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              Neue Aufgabe hinzufügen
+            </button>
+          )}
           <button
-            onClick={() => setShowAddTask(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            onClick={() => setShowCalendar(true)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors mt-3"
           >
-            <Plus className="w-5 h-5" />
-            Neue Aufgabe hinzufügen
+            <Calendar className="w-5 h-5" />
+            Kalenderansicht
           </button>
+
+          {/* Ansicht-Umschalter */}
+          <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Ansicht</p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setViewMode('tasks')}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === 'tasks'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                }`}
+              >
+                <CheckSquare className="w-4 h-4" />
+                Aufgaben
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode('archive');
+                  loadArchivedTasks();
+                }}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === 'archive'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                }`}
+              >
+                <Archive className="w-4 h-4" />
+                Archiv
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode('statistics');
+                  loadStatistics();
+                }}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === 'statistics'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                }`}
+              >
+                <BarChart className="w-4 h-4" />
+                Statistiken
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Einstellungen Modal */}
         {showSettings && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-8">
-            <div className="bg-white rounded-xl p-6 w-full max-w-2xl my-4 sm:my-8 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-2xl my-4 sm:my-8 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-800">Einstellungen</h3>
+                <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Einstellungen</h3>
                 <button
                   onClick={() => setShowSettings(false)}
-                  className="p-2 text-gray-500 hover:text-gray-700"
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700"
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -892,7 +1333,7 @@ export default function HouseholdPlanner() {
                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
                     >
                       <div>
-                        <p className="font-medium text-gray-800">{member.name}</p>
+                        <p className="font-medium text-gray-800 dark:text-gray-100">{member.name}</p>
                         <p className="text-sm text-gray-500">{member.email}</p>
                         {member._id === selectedHousehold.createdBy && (
                           <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded mt-1 inline-block">
@@ -919,17 +1360,33 @@ export default function HouseholdPlanner() {
                     {selectedHousehold.invites
                       .filter(inv => inv.status === 'pending')
                       .map((inv, idx) => (
-                        <div key={idx} className="text-sm text-gray-500 bg-yellow-50 p-2 rounded mb-1">
+                        <div key={idx} className="text-sm text-gray-500 dark:text-gray-400 bg-yellow-50 p-2 rounded mb-1">
                           📧 {inv.email} - Eingeladen am {new Date(inv.invitedAt).toLocaleDateString('de-DE')}
                         </div>
                       ))}
+                  </div>
+                )}
+
+                {/* Haushalt löschen - nur für gemeinsame Haushalte */}
+                {!selectedHousehold.isPrivate && selectedHousehold.members.length === 1 && (
+                  <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-sm text-red-800 mb-3">
+                      <strong>Achtung:</strong> Du bist das einzige Mitglied in diesem Haushalt. Du kannst ihn jetzt löschen.
+                    </p>
+                    <button
+                      onClick={deleteHousehold}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Haushalt dauerhaft löschen
+                    </button>
                   </div>
                 )}
               </div>
 
               <div className="border-t pt-6 mb-6">
                 <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-lg font-semibold text-gray-800">Kategorien verwalten</h4>
+                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Kategorien verwalten</h4>
                   <button
                     onClick={() => setShowAddCategory(true)}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
@@ -941,40 +1398,174 @@ export default function HouseholdPlanner() {
 
                 <div className="space-y-2">
                   {categories.length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">Keine Kategorien vorhanden</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-center py-8">Keine Kategorien vorhanden</p>
                   ) : (
                     categories.map(cat => (
                       <div
                         key={cat._id}
-                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                        className="flex flex-wrap items-center gap-3 p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-[200px]">
                           <div
-                            className="w-6 h-6 rounded"
+                            className="w-6 h-6 rounded flex-shrink-0"
                             style={{ backgroundColor: cat.color }}
                           />
-                          <span className="font-medium text-gray-800">{cat.name}</span>
-                          <span className="text-sm text-gray-500">
-                            ({tasks.filter(t => t.category === cat._id).length} Aufgaben)
-                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-800 dark:text-gray-100 break-words">{cat.name}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                              {tasks.filter(t => t.category === cat._id).length} Aufgaben
+                            </div>
+                          </div>
                         </div>
-                        <button
-                          onClick={() => deleteCategory(cat._id)}
-                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                          <button
+                            onClick={() => {
+                              setEditingCategory(cat);
+                              setShowEditCategory(true);
+                            }}
+                            className="p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
+                          >
+                            <Edit2 className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => deleteCategory(cat._id)}
+                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
                 </div>
               </div>
 
+              <div className="border-t pt-6 mb-6">
+                <h4 className="text-lg font-semibold text-gray-800 mb-4">Darstellung</h4>
+                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                  <div>
+                    <p className="font-medium text-gray-800 dark:text-gray-100">Dark Mode</p>
+                    <p className="text-sm text-gray-500">Dunkles Farbschema aktivieren</p>
+                  </div>
+                  <button
+                    onClick={() => setDarkMode(!darkMode)}
+                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                      darkMode ? 'bg-indigo-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                        darkMode ? 'translate-x-7' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-t pt-6 mb-6">
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                  <Bell className="w-5 h-5" />
+                  Benachrichtigungen
+                </h4>
+                <div className="space-y-4">
+                  {/* Tägliche Aufgaben-Erinnerung */}
+                  <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="font-medium text-gray-800 dark:text-gray-100">Tägliche Erinnerung</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Erhalte eine tägliche Übersicht deiner heutigen Aufgaben</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const newPrefs = { ...notificationPreferences, dailyTaskReminder: !notificationPreferences.dailyTaskReminder };
+                          saveNotificationPreferences(newPrefs);
+                        }}
+                        className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                          notificationPreferences.dailyTaskReminder ? 'bg-indigo-600' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                            notificationPreferences.dailyTaskReminder ? 'translate-x-7' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    {notificationPreferences.dailyTaskReminder && (
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Uhrzeit
+                        </label>
+                        <input
+                          type="time"
+                          value={notificationPreferences.reminderTime}
+                          onChange={(e) => {
+                            const newPrefs = { ...notificationPreferences, reminderTime: e.target.value };
+                            saveNotificationPreferences(newPrefs);
+                          }}
+                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Deadline-Benachrichtigungen */}
+                  <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-800 dark:text-gray-100">Deadline-Erinnerungen</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Benachrichtigungen für anstehende und überfällige Aufgaben</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const newPrefs = { ...notificationPreferences, deadlineNotifications: !notificationPreferences.deadlineNotifications };
+                          saveNotificationPreferences(newPrefs);
+                        }}
+                        className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                          notificationPreferences.deadlineNotifications ? 'bg-indigo-600' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                            notificationPreferences.deadlineNotifications ? 'translate-x-7' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Aufgaben-Zuweisungen */}
+                  <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-800 dark:text-gray-100">Aufgaben-Zuweisungen</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Benachrichtigungen wenn dir eine Aufgabe zugewiesen wird</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const newPrefs = { ...notificationPreferences, taskAssignments: !notificationPreferences.taskAssignments };
+                          saveNotificationPreferences(newPrefs);
+                        }}
+                        className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                          notificationPreferences.taskAssignments ? 'bg-indigo-600' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                            notificationPreferences.taskAssignments ? 'translate-x-7' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="border-t pt-6">
-                <h4 className="text-lg font-semibold text-gray-800 mb-4">Konto</h4>
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Konto</h4>
                 <div className="space-y-2">
-                  <p className="text-gray-600"><strong>Name:</strong> {currentUser?.name}</p>
-                  <p className="text-gray-600"><strong>E-Mail:</strong> {currentUser?.email}</p>
+                  <p className="text-gray-600 dark:text-gray-400"><strong>Name:</strong> {currentUser?.name}</p>
+                  <p className="text-gray-600 dark:text-gray-400"><strong>E-Mail:</strong> {currentUser?.email}</p>
                 </div>
               </div>
             </div>
@@ -984,7 +1575,7 @@ export default function HouseholdPlanner() {
         {/* Einladungs-Modal */}
         {showInviteModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Benutzer einladen</h3>
               <p className="text-gray-600 text-sm mb-4">
                 Gib die E-Mail-Adresse des Benutzers ein, den du zu "{selectedHousehold.name}" einladen möchtest.
@@ -994,7 +1585,7 @@ export default function HouseholdPlanner() {
                 placeholder="E-Mail-Adresse"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
               <div className="flex gap-2">
                 <button
@@ -1008,7 +1599,49 @@ export default function HouseholdPlanner() {
                     setShowInviteModal(false);
                     setInviteEmail('');
                   }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Kategorie bearbeiten Modal */}
+        {showEditCategory && editingCategory && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Kategorie bearbeiten</h3>
+              <input
+                type="text"
+                placeholder="Kategoriename"
+                value={editingCategory.name}
+                onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
+              />
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Farbe</label>
+                <input
+                  type="color"
+                  value={editingCategory.color}
+                  onChange={(e) => setEditingCategory({ ...editingCategory, color: e.target.value })}
+                  className="w-full h-12 rounded-lg cursor-pointer"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleEditCategory}
+                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
+                >
+                  Speichern
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEditCategory(false);
+                    setEditingCategory(null);
+                  }}
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
                 >
                   Abbrechen
                 </button>
@@ -1020,17 +1653,17 @@ export default function HouseholdPlanner() {
         {/* Neue Kategorie Modal */}
         {showAddCategory && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Neue Kategorie</h3>
               <input
                 type="text"
                 placeholder="Kategoriename"
                 value={newCategory.name}
                 onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Farbe</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Farbe</label>
                 <input
                   type="color"
                   value={newCategory.color}
@@ -1050,7 +1683,7 @@ export default function HouseholdPlanner() {
                     setShowAddCategory(false);
                     setNewCategory({ name: '', color: '#3b82f6' });
                   }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
                 >
                   Abbrechen
                 </button>
@@ -1062,19 +1695,19 @@ export default function HouseholdPlanner() {
         {/* Neue Aufgabe Modal */}
         {showAddTask && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Neue Aufgabe</h3>
               <input
                 type="text"
                 placeholder="Aufgabentitel"
                 value={newTask.title}
                 onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
               <select
                 value={newTask.category}
                 onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               >
                 <option value="">Kategorie wählen</option>
                 {categories.map(cat => (
@@ -1085,8 +1718,110 @@ export default function HouseholdPlanner() {
                 type="datetime-local"
                 value={newTask.deadline}
                 onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
+
+              {/* Dringlichkeitsstufe */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dringlichkeit</label>
+                <select
+                  value={newTask.priority}
+                  onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                >
+                  <option value="low">Niedrig</option>
+                  <option value="medium">Mittel</option>
+                  <option value="high">Hoch</option>
+                </select>
+              </div>
+
+              {/* Beschreibung */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Beschreibung (optional)</label>
+                <textarea
+                  value={newTask.description}
+                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                  placeholder="Weitere Details zur Aufgabe..."
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg resize-none"
+                  rows="3"
+                />
+              </div>
+
+              {selectedHousehold && !selectedHousehold.isPrivate && (
+                <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
+                  <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Zugewiesen an:</p>
+                  {selectedHousehold.memberDetails?.map(member => (
+                    <label key={member._id} className="flex items-center gap-2 mb-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newTask.assignedTo.includes(member._id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewTask({ ...newTask, assignedTo: [...newTask.assignedTo, member._id] });
+                          } else {
+                            setNewTask({ ...newTask, assignedTo: newTask.assignedTo.filter(id => id !== member._id) });
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-gray-700">{member.name} ({member.email})</span>
+                    </label>
+                  ))}
+                  {newTask.assignedTo.length === 0 && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">Niemand zugewiesen</p>
+                  )}
+                </div>
+              )}
+
+              {/* Wiederkehrende Aufgabe */}
+              <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
+                <label className="flex items-center gap-2 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={newTask.recurrence.enabled}
+                    onChange={(e) => setNewTask({
+                      ...newTask,
+                      recurrence: { ...newTask.recurrence, enabled: e.target.checked }
+                    })}
+                    className="w-4 h-4"
+                  />
+                  <span className="font-medium text-gray-700">Wiederkehrende Aufgabe</span>
+                </label>
+                {newTask.recurrence.enabled && (
+                  <div className="mt-2 space-y-2">
+                    <select
+                      value={newTask.recurrence.frequency}
+                      onChange={(e) => setNewTask({
+                        ...newTask,
+                        recurrence: { ...newTask.recurrence, frequency: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                    >
+                      <option value="daily">Täglich</option>
+                      <option value="weekly">Wöchentlich</option>
+                      <option value="monthly">Monatlich</option>
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Alle</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={newTask.recurrence.interval}
+                        onChange={(e) => setNewTask({
+                          ...newTask,
+                          recurrence: { ...newTask.recurrence, interval: parseInt(e.target.value) || 1 }
+                        })}
+                        className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                      />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {newTask.recurrence.frequency === 'daily' ? 'Tag(e)' :
+                         newTask.recurrence.frequency === 'weekly' ? 'Woche(n)' : 'Monat(e)'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2">
                 <button
                   onClick={handleAddTask}
@@ -1097,9 +1832,17 @@ export default function HouseholdPlanner() {
                 <button
                   onClick={() => {
                     setShowAddTask(false);
-                    setNewTask({ title: '', category: '', deadline: '' });
+                    setNewTask({
+                      title: '',
+                      category: '',
+                      deadline: '',
+                      assignedTo: [],
+                      priority: 'medium',
+                      description: '',
+                      recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
+                    });
                   }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
                 >
                   Abbrechen
                 </button>
@@ -1111,19 +1854,19 @@ export default function HouseholdPlanner() {
         {/* Aufgabe bearbeiten Modal */}
         {showEditTask && editingTask && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md my-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Aufgabe bearbeiten</h3>
               <input
                 type="text"
                 placeholder="Aufgabentitel"
                 value={editingTask.title}
                 onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
               <select
                 value={editingTask.category}
                 onChange={(e) => setEditingTask({ ...editingTask, category: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               >
                 <option value="">Kategorie wählen</option>
                 {categories.map(cat => (
@@ -1134,8 +1877,116 @@ export default function HouseholdPlanner() {
                 type="datetime-local"
                 value={editingTask.deadline}
                 onChange={(e) => setEditingTask({ ...editingTask, deadline: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
               />
+
+              {/* Dringlichkeitsstufe */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dringlichkeit</label>
+                <select
+                  value={editingTask.priority || 'medium'}
+                  onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                >
+                  <option value="low">Niedrig</option>
+                  <option value="medium">Mittel</option>
+                  <option value="high">Hoch</option>
+                </select>
+              </div>
+
+              {/* Beschreibung */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Beschreibung (optional)</label>
+                <textarea
+                  value={editingTask.description || ''}
+                  onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                  placeholder="Weitere Details zur Aufgabe..."
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg resize-none"
+                  rows="3"
+                />
+              </div>
+
+              {selectedHousehold && !selectedHousehold.isPrivate && (
+                <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
+                  <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Zugewiesen an:</p>
+                  {selectedHousehold.memberDetails?.map(member => (
+                    <label key={member._id} className="flex items-center gap-2 mb-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingTask.assignedTo?.includes(member._id) || false}
+                        onChange={(e) => {
+                          const currentAssigned = editingTask.assignedTo || [];
+                          if (e.target.checked) {
+                            setEditingTask({ ...editingTask, assignedTo: [...currentAssigned, member._id] });
+                          } else {
+                            setEditingTask({ ...editingTask, assignedTo: currentAssigned.filter(id => id !== member._id) });
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-gray-700">{member.name} ({member.email})</span>
+                    </label>
+                  ))}
+                  {(!editingTask.assignedTo || editingTask.assignedTo.length === 0) && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">Niemand zugewiesen</p>
+                  )}
+                </div>
+              )}
+
+              {/* Wiederkehrende Aufgabe */}
+              <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
+                <label className="flex items-center gap-2 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={editingTask.recurrence?.enabled || false}
+                    onChange={(e) => setEditingTask({
+                      ...editingTask,
+                      recurrence: {
+                        ...editingTask.recurrence,
+                        enabled: e.target.checked,
+                        frequency: editingTask.recurrence?.frequency || 'weekly',
+                        interval: editingTask.recurrence?.interval || 1
+                      }
+                    })}
+                    className="w-4 h-4"
+                  />
+                  <span className="font-medium text-gray-700">Wiederkehrende Aufgabe</span>
+                </label>
+                {editingTask.recurrence?.enabled && (
+                  <div className="mt-2 space-y-2">
+                    <select
+                      value={editingTask.recurrence.frequency}
+                      onChange={(e) => setEditingTask({
+                        ...editingTask,
+                        recurrence: { ...editingTask.recurrence, frequency: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                    >
+                      <option value="daily">Täglich</option>
+                      <option value="weekly">Wöchentlich</option>
+                      <option value="monthly">Monatlich</option>
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Alle</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={editingTask.recurrence.interval}
+                        onChange={(e) => setEditingTask({
+                          ...editingTask,
+                          recurrence: { ...editingTask.recurrence, interval: parseInt(e.target.value) || 1 }
+                        })}
+                        className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                      />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {editingTask.recurrence.frequency === 'daily' ? 'Tag(e)' :
+                         editingTask.recurrence.frequency === 'weekly' ? 'Woche(n)' : 'Monat(e)'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2">
                 <button
                   onClick={handleEditTask}
@@ -1148,7 +1999,7 @@ export default function HouseholdPlanner() {
                     setShowEditTask(false);
                     setEditingTask(null);
                   }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
                 >
                   Abbrechen
                 </button>
@@ -1157,18 +2008,140 @@ export default function HouseholdPlanner() {
           </div>
         )}
 
+        {/* Kalenderansicht Modal */}
+        {showCalendar && selectedHousehold && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-8">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-4xl my-4">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Kalenderansicht</h3>
+                <button
+                  onClick={() => setShowCalendar(false)}
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {(() => {
+                  // Gruppiere Tasks nach Datum
+                  const tasksByDate = {};
+                  const today = new Date();
+                  const nextDays = 14; // Zeige nächsten 14 Tage
+
+                  // Initialisiere die nächsten 14 Tage
+                  for (let i = 0; i < nextDays; i++) {
+                    const date = new Date(today);
+                    date.setDate(date.getDate() + i);
+                    const dateKey = date.toISOString().split('T')[0];
+                    tasksByDate[dateKey] = [];
+                  }
+
+                  // Füge Tasks zu den entsprechenden Daten hinzu
+                  tasks.filter(task => task.deadline && !task.completed).forEach(task => {
+                    const taskDate = new Date(task.deadline).toISOString().split('T')[0];
+                    if (tasksByDate[taskDate]) {
+                      tasksByDate[taskDate].push(task);
+                    }
+                  });
+
+                  return Object.entries(tasksByDate).map(([dateKey, dateTasks]) => {
+                    const date = new Date(dateKey);
+                    const isToday = dateKey === today.toISOString().split('T')[0];
+                    const dayName = date.toLocaleDateString('de-DE', { weekday: 'long' });
+                    const dateStr = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+                    return (
+                      <div key={dateKey} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className={`px-3 py-1 rounded-lg ${isToday ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'}`}>
+                            <span className="font-bold">{dayName}</span>
+                            <span className="ml-2 text-sm">{dateStr}</span>
+                          </div>
+                          <span className="text-sm text-gray-500">
+                            {dateTasks.length} {dateTasks.length === 1 ? 'Aufgabe' : 'Aufgaben'}
+                          </span>
+                        </div>
+
+                        {dateTasks.length === 0 ? (
+                          <p className="text-gray-400 text-sm italic ml-2">Keine Aufgaben</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {dateTasks.map(task => {
+                              const category = categories.find(cat => cat._id === task.category);
+                              const assignedNames = task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0
+                                ? task.assignedTo.map(userId =>
+                                    selectedHousehold.memberDetails?.find(m => m._id === userId)?.name || 'Unbekannt'
+                                  ).join(', ')
+                                : null;
+                              const taskTime = new Date(task.deadline).toLocaleTimeString('de-DE', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              });
+
+                              return (
+                                <div
+                                  key={task._id}
+                                  className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                                  onClick={() => openEditTask(task)}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <div
+                                    className="w-3 h-3 rounded-full flex-shrink-0 mt-1.5"
+                                    style={{ backgroundColor: category?.color || '#6B7280' }}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <div className="font-medium text-gray-800 dark:text-gray-100">{task.title}</div>
+                                      {task.priority && (
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                          task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' :
+                                          task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100' :
+                                          'bg-yellow-100 text-yellow-700 dark:bg-yellow-600 dark:text-yellow-100'
+                                        }`}>
+                                          {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                      {taskTime}
+                                      {category && ` • ${category.name}`}
+                                      {assignedNames && ` • ${assignedNames}`}
+                                      {task.recurrence?.enabled && ' • 🔄'}
+                                    </div>
+                                    {task.description && (
+                                      <div className="mt-1 text-xs text-gray-600 dark:text-gray-300 line-clamp-2">
+                                        {task.description}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Aufgabenliste */}
-        <div className="space-y-6">
-          {/* Aktive Aufgaben */}
-          <div>
-            <h2 className="text-xl font-bold text-gray-800 mb-4">
+        {viewMode === 'tasks' && (
+          <div className="space-y-6">
+            {/* Aktive Aufgaben */}
+            <div>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
               Aktive Aufgaben ({activeTasks.length})
             </h2>
             {sortedActiveTasks.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-md p-12 text-center">
-                <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg">Keine aktiven Aufgaben</p>
-                <p className="text-gray-400 text-sm mt-2">Gut gemacht! 🎉</p>
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
+                <Calendar className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400 text-lg">Keine aktiven Aufgaben</p>
+                <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Gut gemacht! 🎉</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -1180,28 +2153,28 @@ export default function HouseholdPlanner() {
                   return (
                     <div
                       key={task._id}
-                      className={`bg-white rounded-xl shadow-md p-4 transition-all ${
-                        isOverdue ? 'border-2 border-red-500 bg-red-50' : ''
+                      className={`bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-all ${
+                        isOverdue ? 'border-2 border-red-500 bg-red-50 dark:bg-red-900/20 dark:border-red-400' : ''
                       }`}
                     >
                       <div className="flex items-start gap-3">
                         {isOverdue && (
                           <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-1 animate-pulse" />
                         )}
-                        
+
                         <button
                           onClick={() => toggleTask(task)}
                           className={`mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
                             task.completed
                               ? 'bg-green-500 border-green-500'
-                              : 'border-gray-300 hover:border-green-500'
+                              : 'border-gray-300 dark:border-gray-600 hover:border-green-500'
                           }`}
                         >
                           {task.completed && <Check className="w-4 h-4 text-white" />}
                         </button>
 
                         <div className="flex-1 min-w-0">
-                          <h3 className={`font-medium ${isOverdue ? 'text-red-700 font-bold' : 'text-gray-800'}`}>
+                          <h3 className={`font-medium ${isOverdue ? 'text-red-700 dark:text-red-400 font-bold' : 'text-gray-800 dark:text-gray-100'}`}>
                             {task.title}
                           </h3>
                           <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -1213,34 +2186,67 @@ export default function HouseholdPlanner() {
                                 {category.name}
                               </span>
                             )}
+                            {task.priority && (
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' :
+                                task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100' :
+                                'bg-yellow-100 text-yellow-700 dark:bg-yellow-600 dark:text-yellow-100'
+                              }`}>
+                                {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
+                              </span>
+                            )}
                             {task.deadline && (
                               <div className="flex items-center gap-1 text-xs">
                                 <Bell className={`w-3 h-3 ${
                                   deadlineStatus === 'overdue' ? 'text-red-500' :
-                                  deadlineStatus === 'soon' ? 'text-orange-500' : 'text-gray-600'
+                                  deadlineStatus === 'soon' ? 'text-orange-500' : 'text-gray-600 dark:text-gray-400'
                                 }`} />
                                 <span className={
                                   deadlineStatus === 'overdue' ? 'text-red-500 font-bold' :
-                                  deadlineStatus === 'soon' ? 'text-orange-500 font-medium' : 'text-gray-600'
+                                  deadlineStatus === 'soon' ? 'text-orange-500 font-medium' : 'text-gray-600 dark:text-gray-400'
                                 }>
                                   {formatDate(task.deadline)}
                                   {isOverdue && ' - ÜBERFÄLLIG!'}
                                 </span>
                               </div>
                             )}
+                            {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && selectedHousehold?.memberDetails && (
+                              <div className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400">
+                                <Users className="w-3 h-3" />
+                                <span>
+                                  {task.assignedTo.map(userId =>
+                                    selectedHousehold.memberDetails.find(m => m._id === userId)?.name || 'Unbekannt'
+                                  ).join(', ')}
+                                </span>
+                              </div>
+                            )}
+                            {task.recurrence?.enabled && (
+                              <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400" title="Wiederkehrende Aufgabe">
+                                <RefreshCw className="w-3 h-3" />
+                                <span>
+                                  {task.recurrence.frequency === 'daily' ? 'Täglich' :
+                                   task.recurrence.frequency === 'weekly' ? 'Wöchentlich' : 'Monatlich'}
+                                </span>
+                              </div>
+                            )}
                           </div>
+                          {task.description && (
+                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded p-2">
+                              {task.description}
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => openEditTask(task)}
-                            className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition-colors"
+                            className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
                           >
                             <Edit2 className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => deleteTask(task._id)}
-                            className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                            className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                           >
                             <Trash2 className="w-5 h-5" />
                           </button>
@@ -1258,19 +2264,40 @@ export default function HouseholdPlanner() {
             <div>
               <button
                 onClick={() => setShowCompleted(!showCompleted)}
-                className="flex items-center justify-between w-full text-left mb-4 p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow"
+                className="flex items-center justify-between w-full text-left mb-4 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-shadow"
               >
-                <h2 className="text-xl font-bold text-gray-800">
+                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
                   Erledigte Aufgaben ({completedTasks.length})
                 </h2>
                 {showCompleted ? (
-                  <ChevronUp className="w-6 h-6 text-gray-600" />
+                  <ChevronUp className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                 ) : (
-                  <ChevronDown className="w-6 h-6 text-gray-600" />
+                  <ChevronDown className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                 )}
               </button>
 
               {showCompleted && (
+                <>
+                  {/* Filter nach "Erledigt von" */}
+                  {selectedHousehold && selectedHousehold.memberDetails && selectedHousehold.memberDetails.length > 1 && (
+                    <div className="mb-4 bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Filter: Erledigt von
+                      </label>
+                      <select
+                        value={completedByFilter}
+                        onChange={(e) => setCompletedByFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                      >
+                        <option value="all">Alle anzeigen</option>
+                        {selectedHousehold.memberDetails.map(member => (
+                          <option key={member._id} value={member._id}>
+                            {member.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 <div className="space-y-3">
                   {completedTasks.map(task => {
                     const category = categories.find(cat => cat._id === task.category);
@@ -1278,7 +2305,7 @@ export default function HouseholdPlanner() {
                     return (
                       <div
                         key={task._id}
-                        className="bg-white rounded-xl shadow-md p-4 opacity-70 hover:opacity-100 transition-opacity"
+                        className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 opacity-70 hover:opacity-100 transition-opacity"
                       >
                         <div className="flex items-start gap-3">
                           <button
@@ -1289,7 +2316,7 @@ export default function HouseholdPlanner() {
                           </button>
 
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-gray-800 line-through">
+                            <h3 className="font-medium text-gray-800 dark:text-gray-100 line-through">
                               {task.title}
                             </h3>
                             <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -1301,33 +2328,67 @@ export default function HouseholdPlanner() {
                                   {category.name}
                                 </span>
                               )}
-                              {task.completedAt && (
-                                <span className="text-xs text-gray-600">
-                                  ✅ Erledigt am {formatDate(task.completedAt)}
-                                  {task.completedBy && ` von ${getCompletedByName(task.completedBy)}`}
+                              {task.priority && (
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                  task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' :
+                                  task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100' :
+                                  'bg-yellow-100 text-yellow-700 dark:bg-yellow-600 dark:text-yellow-100'
+                                }`}>
+                                  {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
                                 </span>
                               )}
+                              {task.completedAt && (
+                                <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                                  <Check className="w-3 h-3" />
+                                  <span>
+                                    Erledigt am {formatDate(task.completedAt)}
+                                  </span>
+                                </div>
+                              )}
+                              {task.completedBy && (
+                                <div className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400">
+                                  <User className="w-3 h-3" />
+                                  <span>
+                                    Erledigt von {getCompletedByName(task.completedBy)}
+                                  </span>
+                                </div>
+                              )}
                               {task.deadline && (
-                                <div className="flex items-center gap-1 text-xs text-gray-600">
+                                <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
                                   <Bell className="w-3 h-3" />
                                   <span>
                                     Frist: {formatDate(task.deadline)}
                                   </span>
                                 </div>
                               )}
+                              {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && selectedHousehold?.memberDetails && (
+                                <div className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400">
+                                  <Users className="w-3 h-3" />
+                                  <span>
+                                    {task.assignedTo.map(userId =>
+                                      selectedHousehold.memberDetails.find(m => m._id === userId)?.name || 'Unbekannt'
+                                    ).join(', ')}
+                                  </span>
+                                </div>
+                              )}
                             </div>
+                            {task.description && (
+                              <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded p-2 line-through">
+                                {task.description}
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => openEditTask(task)}
-                              className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition-colors"
+                              className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
                             >
                               <Edit2 className="w-5 h-5" />
                             </button>
                             <button
                               onClick={() => deleteTask(task._id)}
-                              className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                              className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                             >
                               <Trash2 className="w-5 h-5" />
                             </button>
@@ -1337,10 +2398,235 @@ export default function HouseholdPlanner() {
                     );
                   })}
                 </div>
+                </>
               )}
             </div>
           )}
-        </div>
+          </div>
+        )}
+
+        {/* Archiv-Ansicht */}
+        {viewMode === 'archive' && (() => {
+          // Filter archivierte Aufgaben nach completedBy
+          const filteredArchivedTasks = completedByFilter !== 'all'
+            ? archivedTasks.filter(task => task.completedBy === completedByFilter)
+            : archivedTasks;
+
+          return (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                  Archiv ({filteredArchivedTasks.length})
+                </h2>
+              </div>
+
+              {/* Filter nach "Erledigt von" */}
+              {selectedHousehold && selectedHousehold.memberDetails && selectedHousehold.memberDetails.length > 1 && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Filter: Erledigt von
+                  </label>
+                  <select
+                    value={completedByFilter}
+                    onChange={(e) => setCompletedByFilter(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                  >
+                    <option value="all">Alle anzeigen</option>
+                    {selectedHousehold.memberDetails.map(member => (
+                      <option key={member._id} value={member._id}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {filteredArchivedTasks.length === 0 ? (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
+                  <Archive className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400 text-lg">
+                    {completedByFilter !== 'all' ? 'Keine archivierten Aufgaben für diesen Filter' : 'Keine archivierten Aufgaben'}
+                  </p>
+                  <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Erledigte Aufgaben werden nach 14 Tagen automatisch archiviert</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredArchivedTasks.map(task => {
+                  const category = categories.find(cat => cat._id === task.category);
+
+                  return (
+                    <div
+                      key={task._id}
+                      className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 opacity-60"
+                    >
+                      <div className="flex items-start gap-3">
+                        <Check className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-800 dark:text-gray-100 line-through">
+                            {task.title}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            {category && (
+                              <span
+                                className="px-3 py-1 rounded-full text-xs font-medium text-white"
+                                style={{ backgroundColor: category.color }}
+                              >
+                                {category.name}
+                              </span>
+                            )}
+                            {task.priority && (
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' :
+                                task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100' :
+                                'bg-yellow-100 text-yellow-700 dark:bg-yellow-600 dark:text-yellow-100'
+                              }`}>
+                                {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
+                              </span>
+                            )}
+                            {task.completedAt && (
+                              <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                                <Check className="w-3 h-3" />
+                                <span>
+                                  Erledigt am {formatDate(task.completedAt)}
+                                </span>
+                              </div>
+                            )}
+                            {task.completedBy && (
+                              <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                                <User className="w-3 h-3" />
+                                <span>
+                                  von {getCompletedByName(task.completedBy)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {task.description && (
+                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded p-2 line-through">
+                              {task.description}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+        })()}
+
+        {/* Statistik-Ansicht */}
+        {viewMode === 'statistics' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                Statistiken
+              </h2>
+            </div>
+
+            {/* Zeitraum-Auswahl */}
+            <div className="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Zeitraum
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setStatisticsTimeRange('all');
+                    loadStatistics('all');
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                    statisticsTimeRange === 'all'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                  }`}
+                >
+                  Gesamt
+                </button>
+                <button
+                  onClick={() => {
+                    setStatisticsTimeRange('30days');
+                    loadStatistics('30days');
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                    statisticsTimeRange === '30days'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                  }`}
+                >
+                  30 Tage
+                </button>
+                <button
+                  onClick={() => {
+                    setStatisticsTimeRange('7days');
+                    loadStatistics('7days');
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                    statisticsTimeRange === '7days'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                  }`}
+                >
+                  7 Tage
+                </button>
+              </div>
+            </div>
+
+            {statistics.length === 0 ? (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
+                <BarChart className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400 text-lg">Keine Statistiken verfügbar</p>
+                <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Erledigt Aufgaben, um Statistiken zu sehen</p>
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
+                  Erledigte Aufgaben pro Person
+                  {statisticsTimeRange === '7days' && ' (Letzte 7 Tage)'}
+                  {statisticsTimeRange === '30days' && ' (Letzte 30 Tage)'}
+                  {statisticsTimeRange === 'all' && ' (Gesamt)'}
+                </h3>
+                <div className="space-y-4">
+                  {statistics.map((stat, index) => {
+                    const maxCount = Math.max(...statistics.map(s => s.completedCount));
+                    const percentage = (stat.completedCount / maxCount) * 100;
+
+                    return (
+                      <div key={stat.userId} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${
+                              index === 0 ? 'bg-yellow-500' :
+                              index === 1 ? 'bg-gray-400' :
+                              index === 2 ? 'bg-orange-600' : 'bg-indigo-500'
+                            }`}>
+                              {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-800 dark:text-gray-100">{stat.userName}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{stat.userEmail}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{stat.completedCount}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Aufgaben</p>
+                          </div>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                          <div
+                            className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
