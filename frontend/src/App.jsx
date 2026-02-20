@@ -60,6 +60,32 @@ export default function HouseholdPlanner() {
     taskAssignments: true
   });
 
+  // Terminal Mode State
+  const [isTerminalMode, setIsTerminalMode] = useState(false);
+  const [terminalToken, setTerminalToken] = useState(null);
+  const [terminalHousehold, setTerminalHousehold] = useState(null);
+  const [terminalMembers, setTerminalMembers] = useState([]);
+  const [terminalTasks, setTerminalTasks] = useState([]);
+  const [terminalCategories, setTerminalCategories] = useState([]);
+  const [showWhoCompletedModal, setShowWhoCompletedModal] = useState(false);
+  const [pendingCompleteTask, setPendingCompleteTask] = useState(null);
+  const [terminalClock, setTerminalClock] = useState(new Date());
+  const [showTerminalAddTask, setShowTerminalAddTask] = useState(false);
+  const [showTerminalEditTask, setShowTerminalEditTask] = useState(false);
+  const [editingTerminalTask, setEditingTerminalTask] = useState(null);
+  const [terminalNewTask, setTerminalNewTask] = useState({ title: '', category: '', deadline: '', priority: 'medium', description: '' });
+
+  // Terminal Mode: URL-Parameter erkennen
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('terminal');
+    if (urlToken) {
+      setIsTerminalMode(true);
+      setTerminalToken(urlToken);
+      initTerminalMode(urlToken);
+    }
+  }, []);
+
   // Lade Token aus localStorage
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -237,6 +263,39 @@ export default function HouseholdPlanner() {
     }
   };
 
+  // Terminal Mode: Initialisierung
+  const initTerminalMode = async (tToken) => {
+    try {
+      const authRes = await fetch(`${API_URL}/terminal/auth`, {
+        headers: { Authorization: `Bearer ${tToken}` }
+      });
+      if (!authRes.ok) {
+        alert('Ungültiger Terminal-Token');
+        return;
+      }
+      const { household } = await authRes.json();
+      setTerminalHousehold(household);
+      setTerminalMembers(household.memberDetails);
+      await refreshTerminalData(tToken, household._id);
+    } catch (error) {
+      console.error('Terminal Init Fehler:', error);
+      alert('Fehler beim Laden des Terminals');
+    }
+  };
+
+  const refreshTerminalData = async (tToken, householdId) => {
+    try {
+      const [tasksRes, catRes] = await Promise.all([
+        fetch(`${API_URL}/tasks?householdId=${householdId}`, { headers: { Authorization: `Bearer ${tToken}` } }),
+        fetch(`${API_URL}/categories?householdId=${householdId}`, { headers: { Authorization: `Bearer ${tToken}` } })
+      ]);
+      setTerminalTasks(await tasksRes.json());
+      setTerminalCategories(await catRes.json());
+    } catch (error) {
+      console.error('Terminal Refresh Fehler:', error);
+    }
+  };
+
   // Lade archivierte Aufgaben
   const loadArchivedTasks = async () => {
     if (!selectedHousehold) return;
@@ -324,6 +383,22 @@ export default function HouseholdPlanner() {
 
     return () => clearInterval(intervalId);
   }, [selectedHousehold, token]);
+
+  // Terminal: Uhr aktualisieren
+  useEffect(() => {
+    if (!isTerminalMode) return;
+    const clockInterval = setInterval(() => setTerminalClock(new Date()), 1000);
+    return () => clearInterval(clockInterval);
+  }, [isTerminalMode]);
+
+  // Terminal: Daten alle 30 Sekunden aktualisieren
+  useEffect(() => {
+    if (!isTerminalMode || !terminalToken || !terminalHousehold) return;
+    const refreshInterval = setInterval(() => {
+      refreshTerminalData(terminalToken, terminalHousehold._id);
+    }, 30000);
+    return () => clearInterval(refreshInterval);
+  }, [isTerminalMode, terminalToken, terminalHousehold]);
 
   // Haushalt wechseln
   const switchHousehold = (household) => {
@@ -789,6 +864,114 @@ export default function HouseholdPlanner() {
     }
   };
 
+  // Terminal Task-Operationen
+  const terminalRequestCompleteTask = (task) => {
+    setPendingCompleteTask(task);
+    setShowWhoCompletedModal(true);
+  };
+
+  const terminalConfirmCompleteTask = async (memberId) => {
+    if (!pendingCompleteTask) return;
+    try {
+      const res = await fetch(`${API_URL}/tasks/${pendingCompleteTask._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${terminalToken}` },
+        body: JSON.stringify({ completed: true, completedBy: memberId })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setTerminalTasks(prev => prev.map(t => t._id === updated._id ? updated : t));
+      }
+    } catch (error) {
+      console.error('Fehler beim Erledigen:', error);
+    } finally {
+      setShowWhoCompletedModal(false);
+      setPendingCompleteTask(null);
+    }
+  };
+
+  const terminalDeleteTask = async (taskId) => {
+    if (!confirm('Aufgabe wirklich löschen?')) return;
+    try {
+      await fetch(`${API_URL}/tasks/${taskId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${terminalToken}` }
+      });
+      setTerminalTasks(prev => prev.filter(t => t._id !== taskId));
+    } catch (error) {
+      console.error('Fehler beim Löschen:', error);
+    }
+  };
+
+  const terminalCreateTask = async (taskData) => {
+    try {
+      const res = await fetch(`${API_URL}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${terminalToken}` },
+        body: JSON.stringify(taskData)
+      });
+      if (res.ok) {
+        const task = await res.json();
+        setTerminalTasks(prev => [...prev, task]);
+      }
+    } catch (error) {
+      console.error('Fehler beim Erstellen:', error);
+    }
+  };
+
+  const terminalUpdateTask = async (taskId, data) => {
+    try {
+      const res = await fetch(`${API_URL}/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${terminalToken}` },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setTerminalTasks(prev => prev.map(t => t._id === updated._id ? updated : t));
+      }
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren:', error);
+    }
+  };
+
+  // Terminal Token verwalten
+  const generateTerminalToken = async () => {
+    try {
+      const res = await fetch(`${API_URL}/households/${selectedHousehold._id}/terminal-token`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Fehler');
+      const updatedHouseholds = await fetch(`${API_URL}/households`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(r => r.json());
+      setHouseholds(updatedHouseholds);
+      const updatedH = updatedHouseholds.find(h => h._id === selectedHousehold._id);
+      if (updatedH) setSelectedHousehold(updatedH);
+    } catch (error) {
+      alert('Fehler beim Erstellen des Terminal-Tokens');
+    }
+  };
+
+  const revokeTerminalToken = async () => {
+    if (!confirm('Terminal-Token wirklich widerrufen? Bestehende Terminal-URLs werden ungültig.')) return;
+    try {
+      await fetch(`${API_URL}/households/${selectedHousehold._id}/terminal-token`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const updatedHouseholds = await fetch(`${API_URL}/households`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(r => r.json());
+      setHouseholds(updatedHouseholds);
+      const updatedH = updatedHouseholds.find(h => h._id === selectedHousehold._id);
+      if (updatedH) setSelectedHousehold(updatedH);
+    } catch (error) {
+      alert('Fehler beim Widerrufen des Terminal-Tokens');
+    }
+  };
+
   // Kategorie hinzufügen
   const handleAddCategory = async () => {
     if (!newCategory.name) {
@@ -933,6 +1116,278 @@ export default function HouseholdPlanner() {
     const member = selectedHousehold.memberDetails?.find(m => m._id === userId);
     return member ? member.name : 'Unbekannt';
   };
+
+  // Terminal Mode: Ladescreen
+  if (isTerminalMode && !terminalHousehold) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white text-2xl font-light animate-pulse">Terminal wird geladen...</div>
+      </div>
+    );
+  }
+
+  // Terminal Mode: Haupt-Ansicht
+  if (isTerminalMode && terminalHousehold) {
+    const openTasks = terminalTasks.filter(t => !t.completed);
+    const today = new Date();
+    const todayCompleted = terminalTasks.filter(t => {
+      if (!t.completed || !t.completedAt) return false;
+      return new Date(t.completedAt).toDateString() === today.toDateString();
+    });
+
+    return (
+      <div className="min-h-screen bg-gray-900 text-white">
+        {/* Header */}
+        <div className="bg-gray-800 px-6 py-4 flex justify-between items-center border-b border-gray-700">
+          <h1 className="text-3xl font-bold text-white">{terminalHousehold.name}</h1>
+          <div className="text-right">
+            <div className="text-3xl font-mono text-green-400">
+              {terminalClock.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </div>
+            <div className="text-sm text-gray-400 font-mono">
+              {terminalClock.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Bar */}
+        <div className="bg-gray-800 border-b border-gray-700 px-6 py-3 flex gap-4 overflow-x-auto">
+          <div className="bg-gray-700 rounded-lg px-5 py-3 flex-shrink-0 text-center min-w-[80px]">
+            <div className="text-3xl font-bold text-yellow-400">{openTasks.length}</div>
+            <div className="text-xs text-gray-400 mt-1">Offen</div>
+          </div>
+          <div className="bg-gray-700 rounded-lg px-5 py-3 flex-shrink-0 text-center min-w-[80px]">
+            <div className="text-3xl font-bold text-green-400">{todayCompleted.length}</div>
+            <div className="text-xs text-gray-400 mt-1">Heute erledigt</div>
+          </div>
+          {terminalCategories.map(cat => (
+            <div key={cat._id} className="rounded-lg px-5 py-3 flex-shrink-0 text-center bg-gray-700 min-w-[80px]" style={{ borderLeft: `4px solid ${cat.color}` }}>
+              <div className="text-3xl font-bold text-white">{openTasks.filter(t => t.category === cat._id).length}</div>
+              <div className="text-xs text-gray-400 mt-1">{cat.name}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Main Content - 2-column grid */}
+        <div className="p-6 grid grid-cols-2 gap-6 pb-32">
+          {terminalCategories.map(cat => {
+            const catTasks = terminalTasks.filter(t => t.category === cat._id);
+            return (
+              <div key={cat._id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                <div className="px-4 py-3 flex items-center gap-3 border-b border-gray-700">
+                  <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }}></div>
+                  <h2 className="text-lg font-bold text-white">{cat.name}</h2>
+                  <span className="ml-auto text-sm text-gray-400">{catTasks.filter(t => !t.completed).length} offen</span>
+                </div>
+                <div className="p-3 space-y-2">
+                  {catTasks.length === 0 ? (
+                    <p className="text-gray-500 text-sm text-center py-6">Keine Aufgaben</p>
+                  ) : (
+                    catTasks.map(task => (
+                      <div key={task._id} className={`flex items-center gap-3 rounded-lg min-h-[80px] p-3 transition-colors ${
+                        task.completed ? 'bg-gray-700/40 opacity-60' : 'bg-gray-700'
+                      }`}>
+                        <button
+                          onClick={() => !task.completed && terminalRequestCompleteTask(task)}
+                          disabled={task.completed}
+                          className={`flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                            task.completed ? 'bg-green-900/50 text-green-500 cursor-default' : 'bg-green-600 hover:bg-green-500 text-white active:scale-95'
+                          }`}
+                        >
+                          <Check className="w-8 h-8" />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-base font-medium leading-tight ${task.completed ? 'line-through text-gray-500' : 'text-white'}`}>
+                            {task.title}
+                          </p>
+                          {task.deadline && (
+                            <p className={`text-xs mt-1 ${getDeadlineStatus(task.deadline) === 'overdue' ? 'text-red-400 font-medium' : 'text-gray-400'}`}>
+                              {formatDate(task.deadline)}{getDeadlineStatus(task.deadline) === 'overdue' ? ' – ÜBERFÄLLIG' : ''}
+                            </p>
+                          )}
+                          {task.completed && task.completedBy && (
+                            <p className="text-xs text-green-400 mt-1">
+                              ✓ {terminalMembers.find(m => m._id === task.completedBy)?.name || 'Unbekannt'}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => { setEditingTerminalTask({ ...task, deadline: utcToLocal(task.deadline) }); setShowTerminalEditTask(true); }}
+                            className="w-12 h-12 rounded-lg bg-gray-600 hover:bg-gray-500 flex items-center justify-center text-gray-300 transition-colors"
+                          >
+                            <Edit2 className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => terminalDeleteTask(task._id)}
+                            className="w-12 h-12 rounded-lg bg-red-900/40 hover:bg-red-900/70 flex items-center justify-center text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* FAB - Neue Aufgabe */}
+        <button
+          onClick={() => setShowTerminalAddTask(true)}
+          className="fixed bottom-8 right-8 w-20 h-20 rounded-full bg-green-600 hover:bg-green-500 text-white shadow-2xl flex items-center justify-center transition-colors z-40 active:scale-95"
+        >
+          <Plus className="w-10 h-10" />
+        </button>
+
+        {/* WhoCompleted Modal */}
+        {showWhoCompletedModal && pendingCompleteTask && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-8 z-50">
+            <div className="bg-gray-800 rounded-2xl p-8 w-full max-w-lg border border-gray-700 shadow-2xl">
+              <h2 className="text-2xl font-bold text-white mb-2 text-center">Wer hat erledigt?</h2>
+              <p className="text-gray-400 text-center mb-8 text-lg">{pendingCompleteTask.title}</p>
+              <div className="grid grid-cols-2 gap-4">
+                {terminalMembers.map(member => (
+                  <button
+                    key={member._id}
+                    onClick={() => terminalConfirmCompleteTask(member._id)}
+                    className="min-h-[96px] bg-gray-700 hover:bg-green-700 rounded-xl text-xl font-bold text-white transition-colors active:scale-95"
+                  >
+                    {member.name}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => { setShowWhoCompletedModal(false); setPendingCompleteTask(null); }}
+                className="mt-6 w-full py-4 bg-gray-700 hover:bg-gray-600 rounded-xl text-gray-400 text-lg transition-colors"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Add Task Modal */}
+        {showTerminalAddTask && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-8 z-50">
+            <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-md border border-gray-700 shadow-2xl">
+              <h2 className="text-2xl font-bold text-white mb-6">Neue Aufgabe</h2>
+              <input
+                type="text"
+                placeholder="Aufgabentitel"
+                value={terminalNewTask.title}
+                onChange={(e) => setTerminalNewTask({ ...terminalNewTask, title: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 mb-4 text-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <select
+                value={terminalNewTask.category}
+                onChange={(e) => setTerminalNewTask({ ...terminalNewTask, category: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white mb-4 text-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">Kategorie wählen</option>
+                {terminalCategories.map(cat => (
+                  <option key={cat._id} value={cat._id}>{cat.name}</option>
+                ))}
+              </select>
+              <input
+                type="datetime-local"
+                value={terminalNewTask.deadline}
+                onChange={(e) => setTerminalNewTask({ ...terminalNewTask, deadline: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white mb-4 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <select
+                value={terminalNewTask.priority}
+                onChange={(e) => setTerminalNewTask({ ...terminalNewTask, priority: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white mb-6 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="low">Niedrig</option>
+                <option value="medium">Mittel</option>
+                <option value="high">Hoch</option>
+              </select>
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    if (!terminalNewTask.title || !terminalNewTask.category) { alert('Bitte Titel und Kategorie angeben!'); return; }
+                    await terminalCreateTask({ title: terminalNewTask.title, category: terminalNewTask.category, householdId: terminalHousehold._id, deadline: localToUTC(terminalNewTask.deadline), priority: terminalNewTask.priority, assignedTo: [] });
+                    setTerminalNewTask({ title: '', category: '', deadline: '', priority: 'medium', description: '' });
+                    setShowTerminalAddTask(false);
+                  }}
+                  className="flex-1 bg-green-600 hover:bg-green-500 text-white py-4 rounded-xl text-lg font-medium transition-colors"
+                >
+                  Hinzufügen
+                </button>
+                <button
+                  onClick={() => { setShowTerminalAddTask(false); setTerminalNewTask({ title: '', category: '', deadline: '', priority: 'medium', description: '' }); }}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-4 rounded-xl text-lg transition-colors"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Task Modal */}
+        {showTerminalEditTask && editingTerminalTask && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-8 z-50">
+            <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-md border border-gray-700 shadow-2xl">
+              <h2 className="text-2xl font-bold text-white mb-6">Aufgabe bearbeiten</h2>
+              <input
+                type="text"
+                value={editingTerminalTask.title}
+                onChange={(e) => setEditingTerminalTask({ ...editingTerminalTask, title: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white mb-4 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <select
+                value={editingTerminalTask.category}
+                onChange={(e) => setEditingTerminalTask({ ...editingTerminalTask, category: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white mb-4 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {terminalCategories.map(cat => (
+                  <option key={cat._id} value={cat._id}>{cat.name}</option>
+                ))}
+              </select>
+              <input
+                type="datetime-local"
+                value={editingTerminalTask.deadline || ''}
+                onChange={(e) => setEditingTerminalTask({ ...editingTerminalTask, deadline: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <select
+                value={editingTerminalTask.priority || 'medium'}
+                onChange={(e) => setEditingTerminalTask({ ...editingTerminalTask, priority: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white mb-6 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="low">Niedrig</option>
+                <option value="medium">Mittel</option>
+                <option value="high">Hoch</option>
+              </select>
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    await terminalUpdateTask(editingTerminalTask._id, { title: editingTerminalTask.title, category: editingTerminalTask.category, deadline: localToUTC(editingTerminalTask.deadline), priority: editingTerminalTask.priority });
+                    setShowTerminalEditTask(false);
+                    setEditingTerminalTask(null);
+                  }}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-xl text-lg font-medium transition-colors"
+                >
+                  Speichern
+                </button>
+                <button
+                  onClick={() => { setShowTerminalEditTask(false); setEditingTerminalTask(null); }}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-4 rounded-xl text-lg transition-colors"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (showLogin) {
     return (
@@ -1560,6 +2015,57 @@ export default function HouseholdPlanner() {
                   </div>
                 </div>
               </div>
+
+              {!selectedHousehold.isPrivate && (
+                <div className="border-t pt-6 mb-6">
+                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                    Terminal-Modus
+                  </h4>
+                  {!selectedHousehold.terminalToken ? (
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        Erstelle einen Terminal-Token, um diesen Haushalt auf einem Tablet als dauerhaftes Dashboard zu verwenden. Kein Login erforderlich.
+                      </p>
+                      <button
+                        onClick={generateTerminalToken}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        Terminal-Token erstellen
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        QR-Code scannen oder Link kopieren, um das Terminal zu öffnen. Der Link funktioniert ohne Login.
+                      </p>
+                      <div className="flex flex-col items-center gap-4 mb-4">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}?terminal=${selectedHousehold.terminalToken}`)}`}
+                          alt="Terminal QR-Code"
+                          className="w-48 h-48 rounded-lg border border-gray-200 dark:border-gray-600"
+                        />
+                        <div className="w-full flex gap-2">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}?terminal=${selectedHousehold.terminalToken}`);
+                              alert('Link kopiert!');
+                            }}
+                            className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+                          >
+                            Link kopieren
+                          </button>
+                          <button
+                            onClick={revokeTerminalToken}
+                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                          >
+                            Token widerrufen
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="border-t pt-6">
                 <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Konto</h4>

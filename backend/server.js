@@ -3,6 +3,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const admin = require('firebase-admin');
 const cron = require('node-cron');
 require('dotenv').config();
@@ -72,8 +73,11 @@ const HouseholdSchema = new mongoose.Schema({
     status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
     invitedAt: { type: Date, default: Date.now }
   }],
+  terminalToken: { type: String, default: null },
   createdAt: { type: Date, default: Date.now }
 });
+
+HouseholdSchema.index({ terminalToken: 1 }, { sparse: true });
 
 const TaskSchema = new mongoose.Schema({
   householdId: { type: String, required: true, index: true },
@@ -121,6 +125,49 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, process.env.JWT_SECRET || 'dein-geheimer-schluessel', (err, user) => {
     if (err) return res.status(403).json({ error: 'Token ungültig' });
     req.user = user;
+    next();
+  });
+};
+
+// Terminal Middleware
+const authenticateTerminal = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Nicht autorisiert' });
+
+  try {
+    const household = await Household.findOne({ terminalToken: token });
+    if (!household) return res.status(403).json({ error: 'Token ungültig' });
+    req.terminalHousehold = household;
+    req.isTerminal = true;
+    next();
+  } catch (error) {
+    res.status(500).json({ error: 'Authentifizierung fehlgeschlagen' });
+  }
+};
+
+const authenticateAny = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Nicht autorisiert' });
+
+  // Try terminal token first (DB lookup)
+  try {
+    const household = await Household.findOne({ terminalToken: token });
+    if (household) {
+      req.terminalHousehold = household;
+      req.isTerminal = true;
+      return next();
+    }
+  } catch (e) {
+    // fall through to JWT
+  }
+
+  // Try JWT
+  jwt.verify(token, process.env.JWT_SECRET || 'dein-geheimer-schluessel', (err, user) => {
+    if (err) return res.status(403).json({ error: 'Token ungültig' });
+    req.user = user;
+    req.isTerminal = false;
     next();
   });
 };
@@ -575,8 +622,60 @@ app.delete('/api/households/:householdId/members/:userId', authenticateToken, as
   }
 });
 
+// Terminal Token Routes
+app.post('/api/households/:id/terminal-token', authenticateToken, async (req, res) => {
+  try {
+    const household = await Household.findById(req.params.id);
+    if (!household) return res.status(404).json({ error: 'Haushalt nicht gefunden' });
+    if (!household.members.includes(req.user.id)) return res.status(403).json({ error: 'Keine Berechtigung' });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    household.terminalToken = token;
+    await household.save();
+
+    res.json({ terminalToken: token });
+  } catch (error) {
+    console.error('Terminal Token Fehler:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen des Terminal-Tokens' });
+  }
+});
+
+app.delete('/api/households/:id/terminal-token', authenticateToken, async (req, res) => {
+  try {
+    const household = await Household.findById(req.params.id);
+    if (!household) return res.status(404).json({ error: 'Haushalt nicht gefunden' });
+    if (!household.members.includes(req.user.id)) return res.status(403).json({ error: 'Keine Berechtigung' });
+
+    household.terminalToken = null;
+    await household.save();
+
+    res.json({ message: 'Terminal-Token widerrufen' });
+  } catch (error) {
+    console.error('Terminal Token Widerruf Fehler:', error);
+    res.status(500).json({ error: 'Fehler beim Widerrufen des Terminal-Tokens' });
+  }
+});
+
+app.get('/api/terminal/auth', authenticateTerminal, async (req, res) => {
+  try {
+    const household = req.terminalHousehold;
+    const members = await User.find({ _id: { $in: household.members } }).select('name _id');
+
+    res.json({
+      household: {
+        _id: household._id,
+        name: household.name,
+        memberDetails: members
+      }
+    });
+  } catch (error) {
+    console.error('Terminal Auth Fehler:', error);
+    res.status(500).json({ error: 'Authentifizierung fehlgeschlagen' });
+  }
+});
+
 // Task Routes
-app.get('/api/tasks', authenticateToken, async (req, res) => {
+app.get('/api/tasks', authenticateAny, async (req, res) => {
   try {
     const { householdId } = req.query;
 
@@ -584,10 +683,16 @@ app.get('/api/tasks', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'householdId erforderlich' });
     }
 
-    // Prüfe ob User Mitglied ist
-    const household = await Household.findById(householdId);
-    if (!household || !household.members.includes(req.user.id)) {
-      return res.status(403).json({ error: 'Keine Berechtigung' });
+    // Prüfe Berechtigung
+    if (req.isTerminal) {
+      if (req.terminalHousehold._id.toString() !== householdId) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+      }
+    } else {
+      const household = await Household.findById(householdId);
+      if (!household || !household.members.includes(req.user.id)) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+      }
     }
 
     // Automatisches Archivieren: Erledigte Aufgaben älter als 14 Tage
@@ -734,14 +839,22 @@ app.get('/api/tasks/statistics', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/tasks', authenticateToken, async (req, res) => {
+app.post('/api/tasks', authenticateAny, async (req, res) => {
   try {
     const { householdId } = req.body;
 
-    // Prüfe ob User Mitglied ist
-    const household = await Household.findById(householdId);
-    if (!household || !household.members.includes(req.user.id)) {
-      return res.status(403).json({ error: 'Keine Berechtigung' });
+    // Prüfe Berechtigung
+    let household;
+    if (req.isTerminal) {
+      if (req.terminalHousehold._id.toString() !== householdId) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+      }
+      household = req.terminalHousehold;
+    } else {
+      household = await Household.findById(householdId);
+      if (!household || !household.members.includes(req.user.id)) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+      }
     }
 
     const task = new Task({
@@ -750,34 +863,35 @@ app.post('/api/tasks', authenticateToken, async (req, res) => {
     });
     await task.save();
 
-    // Push Notifications senden
-    const creator = await User.findById(req.user.id);
-    const category = await Category.findById(task.category);
+    // Push Notifications nur für reguläre Benutzer
+    if (!req.isTerminal) {
+      const creator = await User.findById(req.user.id);
+      const category = await Category.findById(task.category);
 
-    // 1. Benachrichtige alle anderen Mitglieder über neue Task
-    const otherMembers = household.members.filter(m => m !== req.user.id);
-    for (const memberId of otherMembers) {
-      await sendPushNotification(
-        memberId,
-        'Neue Aufgabe',
-        `${creator.name} hat "${task.title}" erstellt${category ? ` (${category.name})` : ''}`,
-        { type: 'new_task', taskId: task._id.toString(), householdId }
-      );
-    }
+      // 1. Benachrichtige alle anderen Mitglieder über neue Task
+      const otherMembers = household.members.filter(m => m !== req.user.id);
+      for (const memberId of otherMembers) {
+        await sendPushNotification(
+          memberId,
+          'Neue Aufgabe',
+          `${creator.name} hat "${task.title}" erstellt${category ? ` (${category.name})` : ''}`,
+          { type: 'new_task', taskId: task._id.toString(), householdId }
+        );
+      }
 
-    // 2. Zusätzlich: Wenn Task zugewiesen wurde (und nicht Selbstzuweisung)
-    if (task.assignedTo && Array.isArray(task.assignedTo)) {
-      for (const userId of task.assignedTo) {
-        if (userId !== req.user.id) {
-          // Prüfe ob Benutzer Zuweisungs-Benachrichtigungen aktiviert hat
-          const user = await User.findById(userId);
-          if (user && user.notificationPreferences?.taskAssignments !== false) {
-            await sendPushNotification(
-              userId,
-              'Dir wurde eine Aufgabe zugewiesen',
-              `${creator.name} hat dir "${task.title}" zugewiesen`,
-              { type: 'task_assigned', taskId: task._id.toString(), householdId }
-            );
+      // 2. Zusätzlich: Wenn Task zugewiesen wurde (und nicht Selbstzuweisung)
+      if (task.assignedTo && Array.isArray(task.assignedTo)) {
+        for (const userId of task.assignedTo) {
+          if (userId !== req.user.id) {
+            const user = await User.findById(userId);
+            if (user && user.notificationPreferences?.taskAssignments !== false) {
+              await sendPushNotification(
+                userId,
+                'Dir wurde eine Aufgabe zugewiesen',
+                `${creator.name} hat dir "${task.title}" zugewiesen`,
+                { type: 'task_assigned', taskId: task._id.toString(), householdId }
+              );
+            }
           }
         }
       }
@@ -789,15 +903,23 @@ app.post('/api/tasks', authenticateToken, async (req, res) => {
   }
 });
 
-app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
+app.put('/api/tasks/:id', authenticateAny, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'Aufgabe nicht gefunden' });
 
     // Prüfe Berechtigung
-    const household = await Household.findById(task.householdId);
-    if (!household || !household.members.includes(req.user.id)) {
-      return res.status(403).json({ error: 'Keine Berechtigung' });
+    let household;
+    if (req.isTerminal) {
+      if (req.terminalHousehold._id.toString() !== task.householdId) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+      }
+      household = req.terminalHousehold;
+    } else {
+      household = await Household.findById(task.householdId);
+      if (!household || !household.members.includes(req.user.id)) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+      }
     }
 
     // Speichere alte Zuweisung für Notification-Vergleich
@@ -807,7 +929,15 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
     if (req.body.completed !== undefined && req.body.completed !== task.completed) {
       if (req.body.completed) {
         req.body.completedAt = new Date();
-        req.body.completedBy = req.user.id;
+        if (req.isTerminal) {
+          // Frontend übergibt completedBy (Mitglieds-ID); validieren dass es ein Haushaltsmitglied ist
+          if (req.body.completedBy && !household.members.includes(req.body.completedBy)) {
+            return res.status(400).json({ error: 'Ungültiges Mitglied' });
+          }
+          // req.body.completedBy bleibt wie übergeben
+        } else {
+          req.body.completedBy = req.user.id;
+        }
       } else {
         req.body.completedAt = null;
         req.body.completedBy = null;
@@ -864,8 +994,8 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
       console.log(`✅ Wiederkehrende Aufgabe erstellt: "${task.title}" (neues Datum: ${nextDeadline})`);
     }
 
-    // Push Notification bei Zuweisung (nur für neu hinzugefügte User)
-    if (req.body.assignedTo !== undefined && Array.isArray(req.body.assignedTo)) {
+    // Push Notification bei Zuweisung (nur für reguläre Benutzer, nicht Terminal)
+    if (!req.isTerminal && req.body.assignedTo !== undefined && Array.isArray(req.body.assignedTo)) {
       const oldAssignedSet = new Set(Array.isArray(oldAssignedTo) ? oldAssignedTo : []);
       const newAssignedUsers = req.body.assignedTo.filter(userId =>
         !oldAssignedSet.has(userId) && userId !== req.user.id
@@ -874,7 +1004,6 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
       if (newAssignedUsers.length > 0) {
         const assigner = await User.findById(req.user.id);
         for (const userId of newAssignedUsers) {
-          // Prüfe ob Benutzer Zuweisungs-Benachrichtigungen aktiviert hat
           const user = await User.findById(userId);
           if (user && user.notificationPreferences?.taskAssignments !== false) {
             await sendPushNotification(
@@ -894,15 +1023,21 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
   }
 });
 
-app.delete('/api/tasks/:id', authenticateToken, async (req, res) => {
+app.delete('/api/tasks/:id', authenticateAny, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'Aufgabe nicht gefunden' });
 
     // Prüfe Berechtigung
-    const household = await Household.findById(task.householdId);
-    if (!household || !household.members.includes(req.user.id)) {
-      return res.status(403).json({ error: 'Keine Berechtigung' });
+    if (req.isTerminal) {
+      if (req.terminalHousehold._id.toString() !== task.householdId) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+      }
+    } else {
+      const household = await Household.findById(task.householdId);
+      if (!household || !household.members.includes(req.user.id)) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+      }
     }
 
     await Task.findByIdAndDelete(req.params.id);
@@ -913,18 +1048,24 @@ app.delete('/api/tasks/:id', authenticateToken, async (req, res) => {
 });
 
 // Category Routes
-app.get('/api/categories', authenticateToken, async (req, res) => {
+app.get('/api/categories', authenticateAny, async (req, res) => {
   try {
     const { householdId } = req.query;
-    
+
     if (!householdId) {
       return res.status(400).json({ error: 'householdId erforderlich' });
     }
 
     // Prüfe Berechtigung
-    const household = await Household.findById(householdId);
-    if (!household || !household.members.includes(req.user.id)) {
-      return res.status(403).json({ error: 'Keine Berechtigung' });
+    if (req.isTerminal) {
+      if (req.terminalHousehold._id.toString() !== householdId) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+      }
+    } else {
+      const household = await Household.findById(householdId);
+      if (!household || !household.members.includes(req.user.id)) {
+        return res.status(403).json({ error: 'Keine Berechtigung' });
+      }
     }
 
     const categories = await Category.find({ householdId });
