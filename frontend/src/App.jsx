@@ -4,10 +4,6 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
-// Backend API URL - Für lokale Entwicklung
-const API_URL = 'https://backend.app.mr-dk.de/api';
-const FRONTEND_URL = 'https://backend.app.mr-dk.de';
-
 export default function HouseholdPlanner() {
   const [currentUser, setCurrentUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -19,6 +15,10 @@ export default function HouseholdPlanner() {
   const [registerName, setRegisterName] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [serverUrl, setServerUrl] = useState(() => localStorage.getItem('serverUrl') || '');
+
+  const API_URL = serverUrl ? `${serverUrl.replace(/\/+$/, '')}/api` : '';
+  const FRONTEND_URL = serverUrl ? serverUrl.replace(/\/+$/, '') : '';
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [households, setHouseholds] = useState([]);
@@ -96,6 +96,11 @@ export default function HouseholdPlanner() {
     const urlToken = params.get('terminal');
     const savedTerminalToken = localStorage.getItem('terminalToken');
     if (urlToken) {
+      if (!serverUrl) {
+        const origin = window.location.origin;
+        setServerUrl(origin);
+        localStorage.setItem('serverUrl', origin);
+      }
       setIsTerminalMode(true);
       setTerminalToken(urlToken);
       localStorage.setItem('terminalToken', urlToken);
@@ -111,7 +116,7 @@ export default function HouseholdPlanner() {
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
-    if (savedToken && savedUser) {
+    if (savedToken && savedUser && serverUrl) {
       setToken(savedToken);
       setCurrentUser(JSON.parse(savedUser));
       setShowLogin(false);
@@ -120,6 +125,11 @@ export default function HouseholdPlanner() {
       loadNotificationPreferences(savedToken);
     }
   }, []);
+
+  // Server-URL in localStorage speichern
+  useEffect(() => {
+    if (serverUrl) localStorage.setItem('serverUrl', serverUrl);
+  }, [serverUrl]);
 
   // Dark Mode aus localStorage laden
   useEffect(() => {
@@ -350,13 +360,20 @@ export default function HouseholdPlanner() {
       if (barcodes.length > 0) {
         const rawValue = barcodes[0].rawValue;
         let extractedToken = rawValue;
-        // Falls der QR-Code eine URL mit ?terminal=... enthält
+        let extractedServerUrl = serverUrl;
         try {
           const url = new URL(rawValue);
           const urlToken = url.searchParams.get('terminal');
-          if (urlToken) extractedToken = urlToken;
+          if (urlToken) {
+            extractedToken = urlToken;
+            extractedServerUrl = url.origin;
+          }
         } catch {
-          // Kein URL-Format, nutze den Raw-Wert als Token
+          // Kein URL-Format, nutze Raw-Wert als Token
+        }
+        if (extractedServerUrl) {
+          setServerUrl(extractedServerUrl);
+          localStorage.setItem('serverUrl', extractedServerUrl);
         }
         localStorage.setItem('terminalToken', extractedToken);
         setIsTerminalMode(true);
@@ -1776,6 +1793,17 @@ export default function HouseholdPlanner() {
             </p>
           </div>
 
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Server-URL</label>
+            <input
+              type="url"
+              placeholder="https://mein-server.example.com"
+              value={serverUrl}
+              onChange={(e) => setServerUrl(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+            />
+          </div>
+
           {!isRegistering ? (
             <div className="space-y-4">
               <input
@@ -1795,7 +1823,7 @@ export default function HouseholdPlanner() {
               />
               <button
                 onClick={handleLogin}
-                disabled={loading}
+                disabled={loading || !serverUrl}
                 className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50"
               >
                 {loading ? 'Lädt...' : 'Anmelden'}
@@ -1833,7 +1861,7 @@ export default function HouseholdPlanner() {
               />
               <button
                 onClick={handleRegister}
-                disabled={loading}
+                disabled={loading || !serverUrl}
                 className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50"
               >
                 {loading ? 'Lädt...' : 'Registrieren'}
