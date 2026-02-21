@@ -40,6 +40,14 @@ jobs:
           fi
           npx cap sync android
 
+      - name: Add camera permission for QR code scanning
+        run: |
+          cd frontend/android/app/src/main
+          # Add CAMERA permission before closing </manifest>
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.CAMERA" />' AndroidManifest.xml
+          # Add MLKit barcode metadata before closing </application>
+          sed -i '/<\/application>/i \        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />' AndroidManifest.xml
+
       - name: Create google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
