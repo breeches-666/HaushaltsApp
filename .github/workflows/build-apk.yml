@@ -58,7 +58,7 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > frontend/android/app/keystore.jks
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '\n\r ' | base64 -d > frontend/android/app/keystore.jks
 
       - name: Inject signing config
         run: |
