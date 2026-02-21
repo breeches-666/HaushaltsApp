@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -43,7 +42,6 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/haushaltsplaner')
@@ -1278,11 +1276,6 @@ cron.schedule('* * * * *', async () => {
   } catch (error) {
     console.error('❌ Cron Job Fehler (Tägliche Erinnerung):', error);
   }
-});
-
-// SPA Fallback – alle nicht-API-Routen liefern das Frontend
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Server starten

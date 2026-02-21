@@ -14,9 +14,6 @@ RUN npm ci --only=production && \
 
 COPY --chown=nodejs:nodejs backend/ .
 
-# Vorgebautes Frontend-Dist ins Image kopieren
-COPY --chown=nodejs:nodejs frontend/dist ./public
-
 USER nodejs
 
 EXPOSE 3000
