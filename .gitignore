@@ -28,3 +28,7 @@ frontend/android/
 frontend/ios/
 *.apk
 *.aab
+
+# Keystore files
+*.keystore
+*.jks
