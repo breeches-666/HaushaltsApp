@@ -85,6 +85,7 @@ export default function HouseholdPlanner() {
     return saved ? JSON.parse(saved) : {};
   });
   const [terminalPersonFilter, setTerminalPersonFilter] = useState('all');
+  const [terminalViewTab, setTerminalViewTab] = useState('open'); // 'open' or 'completed'
   const [terminalTaskOverviewCollapsed, setTerminalTaskOverviewCollapsed] = useState(() => {
     return localStorage.getItem('terminalTaskOverviewCollapsed') === 'true';
   });
@@ -1430,89 +1431,137 @@ export default function HouseholdPlanner() {
           </div>
         </div>
 
-        {/* Main Content - 2-column grid with collapsible categories */}
-        <div className="p-6 grid grid-cols-2 gap-6 pb-32">
-          {terminalCategories.map(cat => {
-            const allCatTasks = terminalTasks.filter(t => t.category === cat._id);
-            const catTasks = terminalPersonFilter === 'all'
-              ? allCatTasks
-              : terminalPersonFilter === 'unassigned'
-                ? allCatTasks.filter(t => !t.assignedTo || !Array.isArray(t.assignedTo) || t.assignedTo.length === 0)
-                : allCatTasks.filter(t => Array.isArray(t.assignedTo) && t.assignedTo.includes(terminalPersonFilter));
-            const isCollapsed = terminalCollapsedCategories[cat._id];
-            const openCount = catTasks.filter(t => !t.completed).length;
-            return (
-              <div key={cat._id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-                <div
-                  className="px-4 py-3 flex items-center gap-3 border-b border-gray-700 cursor-pointer select-none hover:bg-gray-750"
-                  onClick={() => toggleTerminalCategoryCollapse(cat._id)}
-                >
-                  <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }}></div>
-                  <h2 className="text-lg font-bold text-white">{cat.name}</h2>
-                  <span className="ml-auto text-sm text-gray-400">{openCount} offen</span>
-                  {isCollapsed ? <ChevronDown className="w-5 h-5 text-gray-400" /> : <ChevronUp className="w-5 h-5 text-gray-400" />}
-                </div>
-                {!isCollapsed && (
-                  <div className="p-3 space-y-2">
-                    {catTasks.length === 0 ? (
-                      <p className="text-gray-500 text-sm text-center py-6">Keine Aufgaben</p>
-                    ) : (
-                      catTasks.map(task => (
-                        <div key={task._id} className={`flex items-center gap-3 rounded-lg min-h-[80px] p-3 transition-colors ${
-                          task.completed ? 'bg-gray-700/40 opacity-60' : 'bg-gray-700'
-                        }`}>
-                          <button
-                            onClick={() => !task.completed && terminalRequestCompleteTask(task)}
-                            disabled={task.completed}
-                            className={`flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
-                              task.completed ? 'bg-green-900/50 text-green-500 cursor-default' : 'bg-green-600 hover:bg-green-500 text-white active:scale-95'
-                            }`}
-                          >
-                            <Check className="w-8 h-8" />
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-base font-medium leading-tight ${task.completed ? 'line-through text-gray-500' : 'text-white'}`}>
-                              {task.title}
-                            </p>
-                            {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
-                              <p className="text-xs text-blue-400 mt-0.5">
-                                {task.assignedTo.map(id => terminalMembers.find(m => m._id === id)?.name).filter(Boolean).join(', ')}
-                              </p>
-                            )}
-                            {task.deadline && (
-                              <p className={`text-xs mt-1 ${getDeadlineStatus(task.deadline) === 'overdue' ? 'text-red-400 font-medium' : 'text-gray-400'}`}>
-                                {formatDate(task.deadline)}{getDeadlineStatus(task.deadline) === 'overdue' ? ' – ÜBERFÄLLIG' : ''}
-                              </p>
-                            )}
-                            {task.completed && task.completedBy && (
-                              <p className="text-xs text-green-400 mt-1">
-                                ✓ {terminalMembers.find(m => m._id === task.completedBy)?.name || 'Unbekannt'}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex flex-col gap-2 flex-shrink-0">
+        {/* Tab Bar: Offen / Erledigt */}
+        <div className="bg-gray-800 border-b border-gray-700 px-6 py-2 flex gap-2">
+          <button
+            onClick={() => setTerminalViewTab('open')}
+            className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              terminalViewTab === 'open'
+                ? 'bg-yellow-500 text-gray-900'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            Offen ({openTasks.length})
+          </button>
+          <button
+            onClick={() => setTerminalViewTab('completed')}
+            className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              terminalViewTab === 'completed'
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            Erledigt ({todayCompleted.length} heute)
+          </button>
+        </div>
+
+        {/* Main Content */}
+        {terminalViewTab === 'open' ? (
+          <div className="p-4 grid grid-cols-3 gap-3 pb-32">
+            {terminalCategories.map(cat => {
+              const allCatTasks = terminalTasks.filter(t => t.category === cat._id && !t.completed);
+              const catTasks = terminalPersonFilter === 'all'
+                ? allCatTasks
+                : terminalPersonFilter === 'unassigned'
+                  ? allCatTasks.filter(t => !t.assignedTo || !Array.isArray(t.assignedTo) || t.assignedTo.length === 0)
+                  : allCatTasks.filter(t => Array.isArray(t.assignedTo) && t.assignedTo.includes(terminalPersonFilter));
+              const isCollapsed = terminalCollapsedCategories[cat._id];
+              return (
+                <div key={cat._id} className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                  <div
+                    className="px-3 py-2 flex items-center gap-2 border-b border-gray-700 cursor-pointer select-none hover:bg-gray-750"
+                    onClick={() => toggleTerminalCategoryCollapse(cat._id)}
+                  >
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }}></div>
+                    <h2 className="text-sm font-bold text-white truncate">{cat.name}</h2>
+                    <span className="ml-auto text-xs text-gray-400 flex-shrink-0">{catTasks.length}</span>
+                    {isCollapsed ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+                  </div>
+                  {!isCollapsed && (
+                    <div className="p-2 space-y-1">
+                      {catTasks.length === 0 ? (
+                        <p className="text-gray-500 text-xs text-center py-3">Keine Aufgaben</p>
+                      ) : (
+                        catTasks.map(task => (
+                          <div key={task._id} className="flex items-center gap-2 rounded-lg p-2 bg-gray-700">
+                            <button
+                              onClick={() => terminalRequestCompleteTask(task)}
+                              className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-600 hover:bg-green-500 text-white flex items-center justify-center transition-colors active:scale-95"
+                            >
+                              <Check className="w-5 h-5" />
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-white leading-tight truncate">{task.title}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
+                                  <span className="text-xs text-blue-400 truncate">
+                                    {task.assignedTo.map(id => terminalMembers.find(m => m._id === id)?.name).filter(Boolean).join(', ')}
+                                  </span>
+                                )}
+                                {task.deadline && (
+                                  <span className={`text-xs flex-shrink-0 ${getDeadlineStatus(task.deadline) === 'overdue' ? 'text-red-400 font-medium' : 'text-gray-400'}`}>
+                                    {formatDate(task.deadline)}{getDeadlineStatus(task.deadline) === 'overdue' ? ' !' : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                             <button
                               onClick={() => { setEditingTerminalTask({ ...task, deadline: utcToLocal(task.deadline) }); setShowTerminalEditTask(true); }}
-                              className="w-12 h-12 rounded-lg bg-gray-600 hover:bg-gray-500 flex items-center justify-center text-gray-300 transition-colors"
+                              className="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-600 hover:bg-gray-500 flex items-center justify-center text-gray-300 transition-colors"
                             >
-                              <Edit2 className="w-5 h-5" />
+                              <Edit2 className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => terminalDeleteTask(task._id)}
-                              className="w-12 h-12 rounded-lg bg-red-900/40 hover:bg-red-900/70 flex items-center justify-center text-red-400 transition-colors"
+                              className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-900/40 hover:bg-red-900/70 flex items-center justify-center text-red-400 transition-colors"
                             >
-                              <Trash2 className="w-5 h-5" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-4 pb-32">
+            <div className="space-y-1">
+              {(() => {
+                const completedTasks = terminalTasks.filter(t => t.completed).sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
+                return completedTasks.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">Keine erledigten Aufgaben</p>
+                ) : (
+                  completedTasks.map(task => {
+                    const cat = terminalCategories.find(c => c._id === task.category);
+                    return (
+                      <div key={task._id} className="flex items-center gap-3 rounded-lg p-3 bg-gray-800 border border-gray-700">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat?.color || '#6b7280' }} title={cat?.name}></div>
+                        <p className="text-sm text-gray-400 line-through truncate flex-1">{task.title}</p>
+                        {task.completedBy && (
+                          <span className="text-xs text-green-400 flex-shrink-0">
+                            {terminalMembers.find(m => m._id === task.completedBy)?.name || 'Unbekannt'}
+                          </span>
+                        )}
+                        {task.completedAt && (
+                          <span className="text-xs text-gray-500 flex-shrink-0">{formatDate(task.completedAt)}</span>
+                        )}
+                        <button
+                          onClick={() => terminalDeleteTask(task._id)}
+                          className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-900/40 hover:bg-red-900/70 flex items-center justify-center text-red-400 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })
+                );
+              })()}
+            </div>
+          </div>
+        )}
 
         {/* FAB - Neue Aufgabe */}
         <button
