@@ -227,7 +227,13 @@ GET    /api/terminal/auth                      Terminal authentifizieren
 GET    /health                                 Health Check
 ```
 
-## Android APK bauen
+## Android APK
+
+### Download
+
+Bei jedem Push auf `main` wird automatisch eine Android-APK via GitHub Actions gebaut. Die aktuelle Version kann direkt unter [Actions](../../actions) als Artefakt heruntergeladen werden.
+
+### Manuell bauen
 
 Siehe [APK-BUILD.md](APK-BUILD.md) fuer die vollstaendige Anleitung zum Erstellen der Android-App mit Capacitor.
 
