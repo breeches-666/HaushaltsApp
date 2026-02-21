@@ -184,6 +184,6 @@ Du hast jetzt eine vollständig funktionierende Android-App, die sich mit deinem
 1. Öffne die App auf dem Smartphone
 2. Registriere einen Benutzer
 3. Erstelle Haushalte und Aufgaben
-4. Alles wird auf dem Server gespeichert: `https://backend.app.mr-dk.de`
+4. Alles wird auf dem Server gespeichert (Server-URL wird in der App konfiguriert)
 
 Viel Spaß mit deiner HaushaltsApp! 📱🏠

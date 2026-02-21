@@ -87,7 +87,7 @@ sudo nginx -t
 sudo systemctl restart nginx
 
 # 6. SSL mit Let's Encrypt
-sudo certbot --nginx -d backend.app.mr-dk.de
+sudo certbot --nginx -d your-domain.example.com
 ```
 
 ### Frontend deployen
@@ -96,7 +96,7 @@ sudo certbot --nginx -d backend.app.mr-dk.de
 - Repository verbinden
 - Build Command: `cd frontend && npm run build`
 - Publish Directory: `frontend/dist`
-- Environment Variable: `VITE_API_URL=https://backend.app.mr-dk.de/api`
+- Die Server-URL wird in der App beim Login konfiguriert
 
 **Option 2: Eigener Server mit Nginx**
 ```bash

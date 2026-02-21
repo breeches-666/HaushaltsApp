@@ -7,7 +7,7 @@ Diese Anleitung zeigt dir, wie du das Backend der HaushaltsApp auf einem Server 
 Dein Server sollte haben:
 - Ubuntu 20.04+ (oder ähnliche Linux-Distribution)
 - Docker & Docker Compose installiert
-- Domain oder Subdomain (z.B. `backend.app.mr-dk.de`)
+- Domain oder Subdomain (z.B. `your-domain.example.com`)
 - Mindestens 1 GB RAM
 - Offene Ports: 80, 443, 3000 (optional)
 
@@ -147,7 +147,7 @@ Füge folgende Konfiguration ein:
 ```nginx
 server {
     listen 80;
-    server_name backend.app.mr-dk.de;  # ÄNDERE DIES ZU DEINER DOMAIN!
+    server_name your-domain.example.com;  # ÄNDERE DIES ZU DEINER DOMAIN!
 
     # Größere Request-Größe erlauben
     client_max_body_size 10M;
@@ -187,7 +187,7 @@ sudo systemctl restart nginx
 sudo apt install certbot python3-certbot-nginx -y
 
 # SSL-Zertifikat erstellen und automatisch Nginx konfigurieren
-sudo certbot --nginx -d backend.app.mr-dk.de
+sudo certbot --nginx -d your-domain.example.com
 
 # Folge den Anweisungen:
 # - E-Mail eingeben
@@ -206,20 +206,20 @@ sudo certbot renew --dry-run
 
 ```bash
 # HTTP (sollte zu HTTPS umleiten)
-curl http://backend.app.mr-dk.de/health
+curl http://your-domain.example.com/health
 
 # HTTPS
-curl https://backend.app.mr-dk.de/health
+curl https://your-domain.example.com/health
 ```
 
 **Im Browser öffnen:**
-- https://backend.app.mr-dk.de/health
+- https://your-domain.example.com/health
 
 Du solltest sehen: `{"status":"ok","timestamp":"..."}`
 
 ### Frontend mit Backend verbinden
 
-Das Frontend ist bereits konfiguriert für: `https://backend.app.mr-dk.de/api`
+Die Server-URL wird im Frontend beim Login konfiguriert (z.B. `https://your-domain.example.com`).
 
 Starte das Frontend lokal:
 ```bash
@@ -369,8 +369,8 @@ Bei Problemen:
 ## 🎉 Fertig!
 
 Dein Backend läuft jetzt auf:
-- **HTTP**: http://backend.app.mr-dk.de (leitet um zu HTTPS)
-- **HTTPS**: https://backend.app.mr-dk.de
-- **Health Check**: https://backend.app.mr-dk.de/health
+- **HTTP**: http://your-domain.example.com (leitet um zu HTTPS)
+- **HTTPS**: https://your-domain.example.com
+- **Health Check**: https://your-domain.example.com/health
 
 Das Frontend kann jetzt von jedem Gerät aus auf das Backend zugreifen!
