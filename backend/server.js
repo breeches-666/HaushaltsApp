@@ -54,6 +54,7 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   fcmToken: { type: String, default: null }, // Firebase Cloud Messaging Token für Push Notifications
+  timezone: { type: String, default: 'Europe/Berlin' }, // IANA Zeitzone des Benutzers
   notificationPreferences: {
     dailyTaskReminder: { type: Boolean, default: true }, // Tägliche Erinnerung für heutige Aufgaben
     reminderTime: { type: String, default: '07:00' }, // Uhrzeit für tägliche Erinnerung (HH:MM)
@@ -340,11 +341,14 @@ app.get('/api/user/notification-preferences', authenticateToken, async (req, res
       return res.status(404).json({ error: 'Benutzer nicht gefunden' });
     }
 
-    res.json(user.notificationPreferences || {
-      dailyTaskReminder: true,
-      reminderTime: '07:00',
-      deadlineNotifications: true,
-      taskAssignments: true
+    res.json({
+      ...(user.notificationPreferences || {
+        dailyTaskReminder: true,
+        reminderTime: '07:00',
+        deadlineNotifications: true,
+        taskAssignments: true
+      }),
+      timezone: user.timezone || 'Europe/Berlin'
     });
   } catch (error) {
     console.error('Fehler beim Laden der Benachrichtigungseinstellungen:', error);
@@ -354,7 +358,7 @@ app.get('/api/user/notification-preferences', authenticateToken, async (req, res
 
 app.put('/api/user/notification-preferences', authenticateToken, async (req, res) => {
   try {
-    const { dailyTaskReminder, reminderTime, deadlineNotifications, taskAssignments } = req.body;
+    const { dailyTaskReminder, reminderTime, deadlineNotifications, taskAssignments, timezone } = req.body;
 
     const updateData = { notificationPreferences: {} };
 
@@ -362,6 +366,7 @@ app.put('/api/user/notification-preferences', authenticateToken, async (req, res
     if (reminderTime !== undefined) updateData.notificationPreferences.reminderTime = reminderTime;
     if (deadlineNotifications !== undefined) updateData.notificationPreferences.deadlineNotifications = deadlineNotifications;
     if (taskAssignments !== undefined) updateData.notificationPreferences.taskAssignments = taskAssignments;
+    if (timezone) updateData.timezone = timezone;
 
     await User.findByIdAndUpdate(req.user.id, updateData);
     console.log(`✅ Benachrichtigungseinstellungen aktualisiert für User ${req.user.id}`);
@@ -1222,32 +1227,41 @@ cron.schedule('*/5 * * * *', async () => {
 cron.schedule('* * * * *', async () => {
   try {
     const now = new Date();
-    const currentHour = now.getHours().toString().padStart(2, '0');
-    const currentMinute = now.getMinutes().toString().padStart(2, '0');
-    const currentTime = `${currentHour}:${currentMinute}`;
 
-    // Finde alle Benutzer, die zu dieser Uhrzeit eine Erinnerung möchten
+    // Finde alle Benutzer mit aktivierter täglicher Erinnerung
     const users = await User.find({
       'notificationPreferences.dailyTaskReminder': true,
-      'notificationPreferences.reminderTime': currentTime,
       fcmToken: { $ne: null }
     });
 
-    if (users.length === 0) {
-      return; // Keine Benutzer für diese Uhrzeit
-    }
-
-    console.log(`⏰ Tägliche Erinnerung: ${users.length} Benutzer um ${currentTime}`);
+    if (users.length === 0) return;
 
     for (const user of users) {
       try {
+        // Berechne die aktuelle lokale Zeit des Benutzers
+        const userTimezone = user.timezone || 'Europe/Berlin';
+        const utcRef = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+        const userRef = new Date(now.toLocaleString('en-US', { timeZone: userTimezone }));
+        const offsetMs = userRef.getTime() - utcRef.getTime();
+
+        const userHour = userRef.getHours().toString().padStart(2, '0');
+        const userMinute = userRef.getMinutes().toString().padStart(2, '0');
+        const userTime = `${userHour}:${userMinute}`;
+
+        // Prüfe ob jetzt die gewünschte Erinnerungszeit ist
+        if (userTime !== (user.notificationPreferences?.reminderTime || '07:00')) continue;
+
+        console.log(`⏰ Tägliche Erinnerung für User ${user._id} um ${userTime} (${userTimezone})`);
+
         // Finde alle Haushalte des Benutzers
         const households = await Household.find({ members: user._id.toString() });
 
         let totalTodayTasks = 0;
         let totalOverdueTasks = 0;
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-        const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+        // "Heute" in der Zeitzone des Benutzers (als UTC-Grenzen)
+        const todayStart = new Date(Date.UTC(userRef.getFullYear(), userRef.getMonth(), userRef.getDate(), 0, 0, 0) - offsetMs);
+        const todayEnd = new Date(Date.UTC(userRef.getFullYear(), userRef.getMonth(), userRef.getDate(), 23, 59, 59, 999) - offsetMs);
 
         // Zähle nur dem Benutzer zugewiesene Aufgaben über alle Haushalte
         for (const household of households) {

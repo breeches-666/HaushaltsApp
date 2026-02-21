@@ -439,13 +439,14 @@ export default function HouseholdPlanner() {
   const saveNotificationPreferences = async (preferences) => {
     if (!token) return;
     try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       await fetch(`${API_URL}/user/notification-preferences`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(preferences)
+        body: JSON.stringify({ ...preferences, timezone })
       });
       setNotificationPreferences(preferences);
       alert('Benachrichtigungseinstellungen gespeichert!');
@@ -1873,7 +1874,7 @@ export default function HouseholdPlanner() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 overflow-x-hidden">
       <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 shadow-md">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
