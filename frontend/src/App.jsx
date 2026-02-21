@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home, RefreshCw, Archive, BarChart, CheckSquare } from 'lucide-react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
+import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
 // Backend API URL - Für lokale Entwicklung
 const API_URL = 'https://backend.app.mr-dk.de/api';
@@ -47,8 +48,12 @@ export default function HouseholdPlanner() {
   const [newCategory, setNewCategory] = useState({ name: '', color: '#3b82f6' });
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showCompleted, setShowCompleted] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState(() => {
+    const saved = localStorage.getItem('collapsedCategories');
+    return saved ? JSON.parse(saved) : {};
+  });
   const [inviteEmail, setInviteEmail] = useState('');
-  const [assignmentFilter, setAssignmentFilter] = useState('all'); // 'all', 'mine', 'unassigned'
+  const [assignmentFilter, setAssignmentFilter] = useState('all'); // 'all', 'mine', 'unassigned', 'member:<userId>'
   const [completedByFilter, setCompletedByFilter] = useState('all'); // 'all' oder userId
   const [viewMode, setViewMode] = useState('tasks'); // 'tasks', 'archive', 'statistics'
   const [archivedTasks, setArchivedTasks] = useState([]);
@@ -75,15 +80,29 @@ export default function HouseholdPlanner() {
   const [showTerminalEditTask, setShowTerminalEditTask] = useState(false);
   const [editingTerminalTask, setEditingTerminalTask] = useState(null);
   const [terminalNewTask, setTerminalNewTask] = useState({ title: '', category: '', deadline: '', priority: 'medium', description: '' });
+  const [terminalCollapsedCategories, setTerminalCollapsedCategories] = useState(() => {
+    const saved = localStorage.getItem('terminalCollapsedCategories');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [terminalPersonFilter, setTerminalPersonFilter] = useState('all');
+  const [terminalTaskOverviewCollapsed, setTerminalTaskOverviewCollapsed] = useState(() => {
+    return localStorage.getItem('terminalTaskOverviewCollapsed') === 'true';
+  });
 
-  // Terminal Mode: URL-Parameter erkennen
+  // Terminal Mode: URL-Parameter oder localStorage Token erkennen
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('terminal');
+    const savedTerminalToken = localStorage.getItem('terminalToken');
     if (urlToken) {
       setIsTerminalMode(true);
       setTerminalToken(urlToken);
+      localStorage.setItem('terminalToken', urlToken);
       initTerminalMode(urlToken);
+    } else if (savedTerminalToken) {
+      setIsTerminalMode(true);
+      setTerminalToken(savedTerminalToken);
+      initTerminalMode(savedTerminalToken);
     }
   }, []);
 
@@ -120,6 +139,20 @@ export default function HouseholdPlanner() {
       localStorage.setItem('darkMode', 'false');
     }
   }, [darkMode]);
+
+  // Persist collapsed categories
+  useEffect(() => {
+    localStorage.setItem('collapsedCategories', JSON.stringify(collapsedCategories));
+  }, [collapsedCategories]);
+
+  // Persist terminal collapsed categories
+  useEffect(() => {
+    localStorage.setItem('terminalCollapsedCategories', JSON.stringify(terminalCollapsedCategories));
+  }, [terminalCollapsedCategories]);
+
+  useEffect(() => {
+    localStorage.setItem('terminalTaskOverviewCollapsed', terminalTaskOverviewCollapsed);
+  }, [terminalTaskOverviewCollapsed]);
 
   // Push Notifications Setup
   useEffect(() => {
@@ -282,6 +315,59 @@ export default function HouseholdPlanner() {
       console.error('Terminal Init Fehler:', error);
       alert('Fehler beim Laden des Terminals');
     }
+  };
+
+  // QR-Code scannen für Terminal-Modus
+  const scanQRCode = async () => {
+    try {
+      const { camera } = await BarcodeScanner.checkPermissions();
+      if (camera === 'denied') {
+        alert('Kamera-Berechtigung wird benötigt um QR-Codes zu scannen.');
+        return;
+      }
+      if (camera !== 'granted') {
+        const result = await BarcodeScanner.requestPermissions();
+        if (result.camera !== 'granted') {
+          alert('Kamera-Berechtigung wurde verweigert.');
+          return;
+        }
+      }
+
+      const { barcodes } = await BarcodeScanner.scan({
+        formats: [BarcodeFormat.QrCode],
+      });
+
+      if (barcodes.length > 0) {
+        const rawValue = barcodes[0].rawValue;
+        let extractedToken = rawValue;
+        // Falls der QR-Code eine URL mit ?terminal=... enthält
+        try {
+          const url = new URL(rawValue);
+          const urlToken = url.searchParams.get('terminal');
+          if (urlToken) extractedToken = urlToken;
+        } catch {
+          // Kein URL-Format, nutze den Raw-Wert als Token
+        }
+        localStorage.setItem('terminalToken', extractedToken);
+        setIsTerminalMode(true);
+        setTerminalToken(extractedToken);
+        initTerminalMode(extractedToken);
+      }
+    } catch (error) {
+      console.error('QR-Code Scan Fehler:', error);
+      alert('Fehler beim Scannen des QR-Codes.');
+    }
+  };
+
+  // Terminal beenden
+  const exitTerminalMode = () => {
+    localStorage.removeItem('terminalToken');
+    setIsTerminalMode(false);
+    setTerminalToken(null);
+    setTerminalHousehold(null);
+    setTerminalMembers([]);
+    setTerminalTasks([]);
+    setTerminalCategories([]);
   };
 
   const refreshTerminalData = async (tToken, householdId) => {
@@ -1056,6 +1142,22 @@ export default function HouseholdPlanner() {
     }
   };
 
+  // Toggle category collapse
+  const toggleCategoryCollapse = (categoryId) => {
+    setCollapsedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }));
+  };
+
+  // Toggle terminal category collapse
+  const toggleTerminalCategoryCollapse = (categoryId) => {
+    setTerminalCollapsedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }));
+  };
+
   // Deadline-Status
   const getDeadlineStatus = (deadline) => {
     if (!deadline) return null;
@@ -1082,6 +1184,11 @@ export default function HouseholdPlanner() {
   } else if (assignmentFilter === 'unassigned') {
     filteredTasks = filteredTasks.filter(task =>
       !task.assignedTo || (Array.isArray(task.assignedTo) && task.assignedTo.length === 0)
+    );
+  } else if (assignmentFilter.startsWith('member:')) {
+    const memberId = assignmentFilter.split(':')[1];
+    filteredTasks = filteredTasks.filter(task =>
+      task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.includes(memberId)
     );
   }
 
@@ -1118,6 +1225,19 @@ export default function HouseholdPlanner() {
     return member ? member.name : 'Unbekannt';
   };
 
+  // Anstehende Aufgaben-Übersicht (aus ungefiltertem tasks, nicht filteredTasks)
+  const now = new Date();
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const allActiveTasks = tasks.filter(t => !t.completed);
+  const overdueTasks = allActiveTasks
+    .filter(t => t.deadline && new Date(t.deadline) < now)
+    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+    .slice(0, 5);
+  const upcomingTasks = allActiveTasks
+    .filter(t => t.deadline && new Date(t.deadline) >= now && new Date(t.deadline) <= sevenDaysFromNow)
+    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+    .slice(0, 8);
+
   // Terminal Mode: Ladescreen
   if (isTerminalMode && !terminalHousehold) {
     return (
@@ -1141,13 +1261,21 @@ export default function HouseholdPlanner() {
         {/* Header */}
         <div className="bg-gray-800 px-6 py-4 flex justify-between items-center border-b border-gray-700">
           <h1 className="text-3xl font-bold text-white">{terminalHousehold.name}</h1>
-          <div className="text-right">
-            <div className="text-3xl font-mono text-green-400">
-              {terminalClock.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-3xl font-mono text-green-400">
+                {terminalClock.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </div>
+              <div className="text-sm text-gray-400 font-mono">
+                {terminalClock.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+              </div>
             </div>
-            <div className="text-sm text-gray-400 font-mono">
-              {terminalClock.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
-            </div>
+            <button
+              onClick={exitTerminalMode}
+              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
@@ -1169,67 +1297,209 @@ export default function HouseholdPlanner() {
           ))}
         </div>
 
-        {/* Main Content - 2-column grid */}
+        {/* Person Filter Bar */}
+        <div className="bg-gray-800 border-b border-gray-700 px-6 py-3 flex gap-2 overflow-x-auto">
+          <button
+            onClick={() => setTerminalPersonFilter('all')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex-shrink-0 ${
+              terminalPersonFilter === 'all'
+                ? 'bg-green-600 text-white ring-2 ring-green-400'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            <Users className="w-4 h-4 inline mr-1" />
+            Alle
+          </button>
+          {terminalMembers.map(member => {
+            const memberOpenCount = openTasks.filter(t => Array.isArray(t.assignedTo) && t.assignedTo.includes(member._id)).length;
+            return (
+              <button
+                key={member._id}
+                onClick={() => setTerminalPersonFilter(member._id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex-shrink-0 ${
+                  terminalPersonFilter === member._id
+                    ? 'bg-green-600 text-white ring-2 ring-green-400'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                <User className="w-4 h-4 inline mr-1" />
+                {member.name}
+                {memberOpenCount > 0 && (
+                  <span className="ml-1 bg-gray-600 text-gray-200 rounded-full px-2 py-0.5 text-xs">{memberOpenCount}</span>
+                )}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setTerminalPersonFilter('unassigned')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex-shrink-0 ${
+              terminalPersonFilter === 'unassigned'
+                ? 'bg-green-600 text-white ring-2 ring-green-400'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            Nicht zugewiesen
+            {(() => { const c = openTasks.filter(t => !t.assignedTo || !Array.isArray(t.assignedTo) || t.assignedTo.length === 0).length; return c > 0 ? <span className="ml-1 bg-gray-600 text-gray-200 rounded-full px-2 py-0.5 text-xs">{c}</span> : null; })()}
+          </button>
+        </div>
+
+        {/* Task Overview per Person */}
+        <div className="mx-6 mt-4">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+            <div
+              className="px-4 py-3 flex items-center gap-3 border-b border-gray-700 cursor-pointer select-none hover:bg-gray-750"
+              onClick={() => setTerminalTaskOverviewCollapsed(prev => !prev)}
+            >
+              <Users className="w-5 h-5 text-green-400" />
+              <h2 className="text-lg font-bold text-white">Anstehende Aufgaben</h2>
+              <span className="ml-auto text-sm text-gray-400">{openTasks.length} offen</span>
+              {terminalTaskOverviewCollapsed ? <ChevronDown className="w-5 h-5 text-gray-400" /> : <ChevronUp className="w-5 h-5 text-gray-400" />}
+            </div>
+            {!terminalTaskOverviewCollapsed && (
+              <div className="p-4 grid grid-cols-2 gap-4">
+                {terminalMembers.map(member => {
+                  const memberTasks = openTasks.filter(t => Array.isArray(t.assignedTo) && t.assignedTo.includes(member._id));
+                  return (
+                    <div key={member._id} className="bg-gray-700/50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <User className="w-4 h-4 text-green-400" />
+                        <span className="font-medium text-white">{member.name}</span>
+                        <span className="ml-auto text-xs bg-gray-600 text-gray-200 rounded-full px-2 py-0.5">{memberTasks.length}</span>
+                      </div>
+                      {memberTasks.length === 0 ? (
+                        <p className="text-gray-500 text-sm">Keine Aufgaben</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {memberTasks.map(task => (
+                            <div key={task._id} className="flex items-center gap-2 text-sm">
+                              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${task.priority === 'high' ? 'bg-red-400' : task.priority === 'medium' ? 'bg-yellow-400' : 'bg-blue-400'}`}></span>
+                              <span className="text-gray-200 truncate">{task.title}</span>
+                              {task.deadline && (
+                                <span className={`ml-auto text-xs flex-shrink-0 ${getDeadlineStatus(task.deadline) === 'overdue' ? 'text-red-400' : 'text-gray-500'}`}>
+                                  {formatDate(task.deadline)}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {/* Nicht zugewiesen */}
+                {(() => {
+                  const unassignedTasks = openTasks.filter(t => !t.assignedTo || !Array.isArray(t.assignedTo) || t.assignedTo.length === 0);
+                  return (
+                    <div className="bg-gray-700/50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="w-4 h-4 text-yellow-400" />
+                        <span className="font-medium text-white">Nicht zugewiesen</span>
+                        <span className="ml-auto text-xs bg-gray-600 text-gray-200 rounded-full px-2 py-0.5">{unassignedTasks.length}</span>
+                      </div>
+                      {unassignedTasks.length === 0 ? (
+                        <p className="text-gray-500 text-sm">Keine Aufgaben</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {unassignedTasks.map(task => (
+                            <div key={task._id} className="flex items-center gap-2 text-sm">
+                              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${task.priority === 'high' ? 'bg-red-400' : task.priority === 'medium' ? 'bg-yellow-400' : 'bg-blue-400'}`}></span>
+                              <span className="text-gray-200 truncate">{task.title}</span>
+                              {task.deadline && (
+                                <span className={`ml-auto text-xs flex-shrink-0 ${getDeadlineStatus(task.deadline) === 'overdue' ? 'text-red-400' : 'text-gray-500'}`}>
+                                  {formatDate(task.deadline)}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Main Content - 2-column grid with collapsible categories */}
         <div className="p-6 grid grid-cols-2 gap-6 pb-32">
           {terminalCategories.map(cat => {
-            const catTasks = terminalTasks.filter(t => t.category === cat._id);
+            const allCatTasks = terminalTasks.filter(t => t.category === cat._id);
+            const catTasks = terminalPersonFilter === 'all'
+              ? allCatTasks
+              : terminalPersonFilter === 'unassigned'
+                ? allCatTasks.filter(t => !t.assignedTo || !Array.isArray(t.assignedTo) || t.assignedTo.length === 0)
+                : allCatTasks.filter(t => Array.isArray(t.assignedTo) && t.assignedTo.includes(terminalPersonFilter));
+            const isCollapsed = terminalCollapsedCategories[cat._id];
+            const openCount = catTasks.filter(t => !t.completed).length;
             return (
               <div key={cat._id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-                <div className="px-4 py-3 flex items-center gap-3 border-b border-gray-700">
+                <div
+                  className="px-4 py-3 flex items-center gap-3 border-b border-gray-700 cursor-pointer select-none hover:bg-gray-750"
+                  onClick={() => toggleTerminalCategoryCollapse(cat._id)}
+                >
                   <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }}></div>
                   <h2 className="text-lg font-bold text-white">{cat.name}</h2>
-                  <span className="ml-auto text-sm text-gray-400">{catTasks.filter(t => !t.completed).length} offen</span>
+                  <span className="ml-auto text-sm text-gray-400">{openCount} offen</span>
+                  {isCollapsed ? <ChevronDown className="w-5 h-5 text-gray-400" /> : <ChevronUp className="w-5 h-5 text-gray-400" />}
                 </div>
-                <div className="p-3 space-y-2">
-                  {catTasks.length === 0 ? (
-                    <p className="text-gray-500 text-sm text-center py-6">Keine Aufgaben</p>
-                  ) : (
-                    catTasks.map(task => (
-                      <div key={task._id} className={`flex items-center gap-3 rounded-lg min-h-[80px] p-3 transition-colors ${
-                        task.completed ? 'bg-gray-700/40 opacity-60' : 'bg-gray-700'
-                      }`}>
-                        <button
-                          onClick={() => !task.completed && terminalRequestCompleteTask(task)}
-                          disabled={task.completed}
-                          className={`flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
-                            task.completed ? 'bg-green-900/50 text-green-500 cursor-default' : 'bg-green-600 hover:bg-green-500 text-white active:scale-95'
-                          }`}
-                        >
-                          <Check className="w-8 h-8" />
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-base font-medium leading-tight ${task.completed ? 'line-through text-gray-500' : 'text-white'}`}>
-                            {task.title}
-                          </p>
-                          {task.deadline && (
-                            <p className={`text-xs mt-1 ${getDeadlineStatus(task.deadline) === 'overdue' ? 'text-red-400 font-medium' : 'text-gray-400'}`}>
-                              {formatDate(task.deadline)}{getDeadlineStatus(task.deadline) === 'overdue' ? ' – ÜBERFÄLLIG' : ''}
-                            </p>
-                          )}
-                          {task.completed && task.completedBy && (
-                            <p className="text-xs text-green-400 mt-1">
-                              ✓ {terminalMembers.find(m => m._id === task.completedBy)?.name || 'Unbekannt'}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-2 flex-shrink-0">
+                {!isCollapsed && (
+                  <div className="p-3 space-y-2">
+                    {catTasks.length === 0 ? (
+                      <p className="text-gray-500 text-sm text-center py-6">Keine Aufgaben</p>
+                    ) : (
+                      catTasks.map(task => (
+                        <div key={task._id} className={`flex items-center gap-3 rounded-lg min-h-[80px] p-3 transition-colors ${
+                          task.completed ? 'bg-gray-700/40 opacity-60' : 'bg-gray-700'
+                        }`}>
                           <button
-                            onClick={() => { setEditingTerminalTask({ ...task, deadline: utcToLocal(task.deadline) }); setShowTerminalEditTask(true); }}
-                            className="w-12 h-12 rounded-lg bg-gray-600 hover:bg-gray-500 flex items-center justify-center text-gray-300 transition-colors"
+                            onClick={() => !task.completed && terminalRequestCompleteTask(task)}
+                            disabled={task.completed}
+                            className={`flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                              task.completed ? 'bg-green-900/50 text-green-500 cursor-default' : 'bg-green-600 hover:bg-green-500 text-white active:scale-95'
+                            }`}
                           >
-                            <Edit2 className="w-5 h-5" />
+                            <Check className="w-8 h-8" />
                           </button>
-                          <button
-                            onClick={() => terminalDeleteTask(task._id)}
-                            className="w-12 h-12 rounded-lg bg-red-900/40 hover:bg-red-900/70 flex items-center justify-center text-red-400 transition-colors"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-base font-medium leading-tight ${task.completed ? 'line-through text-gray-500' : 'text-white'}`}>
+                              {task.title}
+                            </p>
+                            {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
+                              <p className="text-xs text-blue-400 mt-0.5">
+                                {task.assignedTo.map(id => terminalMembers.find(m => m._id === id)?.name).filter(Boolean).join(', ')}
+                              </p>
+                            )}
+                            {task.deadline && (
+                              <p className={`text-xs mt-1 ${getDeadlineStatus(task.deadline) === 'overdue' ? 'text-red-400 font-medium' : 'text-gray-400'}`}>
+                                {formatDate(task.deadline)}{getDeadlineStatus(task.deadline) === 'overdue' ? ' – ÜBERFÄLLIG' : ''}
+                              </p>
+                            )}
+                            {task.completed && task.completedBy && (
+                              <p className="text-xs text-green-400 mt-1">
+                                ✓ {terminalMembers.find(m => m._id === task.completedBy)?.name || 'Unbekannt'}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => { setEditingTerminalTask({ ...task, deadline: utcToLocal(task.deadline) }); setShowTerminalEditTask(true); }}
+                              className="w-12 h-12 rounded-lg bg-gray-600 hover:bg-gray-500 flex items-center justify-center text-gray-300 transition-colors"
+                            >
+                              <Edit2 className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => terminalDeleteTask(task._id)}
+                              className="w-12 h-12 rounded-lg bg-red-900/40 hover:bg-red-900/70 flex items-center justify-center text-red-400 transition-colors"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1474,6 +1744,18 @@ export default function HouseholdPlanner() {
               </button>
             </div>
           )}
+
+          {Capacitor.isNativePlatform() && (
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <button
+                onClick={scanQRCode}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                <CheckSquare className="w-5 h-5" />
+                QR-Code scannen (Terminal-Modus)
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1532,6 +1814,16 @@ export default function HouseholdPlanner() {
                 <FolderPlus className="w-5 h-5" />
                 <span className="hidden sm:inline">Gemeinsam</span>
               </button>
+              {Capacitor.isNativePlatform() && (
+                <button
+                  onClick={scanQRCode}
+                  className="flex items-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                  title="QR-Code scannen (Terminal-Modus)"
+                >
+                  <CheckSquare className="w-5 h-5" />
+                  <span className="hidden sm:inline">Terminal</span>
+                </button>
+              )}
               <button
                 onClick={() => setShowSettings(true)}
                 className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
@@ -1664,6 +1956,19 @@ export default function HouseholdPlanner() {
                 >
                   Meine Aufgaben
                 </button>
+                {selectedHousehold.memberDetails?.filter(m => m._id !== currentUser?.id).map(member => (
+                  <button
+                    key={member._id}
+                    onClick={() => setAssignmentFilter(`member:${member._id}`)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      assignmentFilter === `member:${member._id}`
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                    }`}
+                  >
+                    {member.name}
+                  </button>
+                ))}
                 <button
                   onClick={() => setAssignmentFilter('unassigned')}
                   className={`px-4 py-2 rounded-lg transition-colors ${
@@ -2639,7 +2944,61 @@ export default function HouseholdPlanner() {
         {/* Aufgabenliste */}
         {viewMode === 'tasks' && (
           <div className="space-y-6">
-            {/* Aktive Aufgaben */}
+            {/* Anstehende Aufgaben-Übersicht */}
+            {(overdueTasks.length > 0 || upcomingTasks.length > 0) && (
+              <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-gray-800 dark:to-gray-800 rounded-xl shadow-md p-5 border border-orange-200 dark:border-gray-700">
+                <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-orange-500" />
+                  Anstehende Aufgaben
+                </h2>
+                {overdueTasks.length > 0 && (
+                  <div className="mb-3">
+                    <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">Überfällig</h3>
+                    <div className="space-y-2">
+                      {overdueTasks.map(task => {
+                        const cat = categories.find(c => c._id === task.category);
+                        return (
+                          <div key={task._id} className="flex items-center gap-3 bg-red-100 dark:bg-red-900/30 rounded-lg px-3 py-2">
+                            {cat && <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />}
+                            <span className="font-medium text-red-800 dark:text-red-300 flex-1 text-sm">{task.title}</span>
+                            <span className="text-xs text-red-600 dark:text-red-400">{formatDate(task.deadline)}</span>
+                            {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && selectedHousehold?.memberDetails && (
+                              <span className="text-xs text-red-500 dark:text-red-400">
+                                {task.assignedTo.map(uid => selectedHousehold.memberDetails.find(m => m._id === uid)?.name || '?').join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {upcomingTasks.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-orange-600 dark:text-orange-400 mb-2">In den nächsten 7 Tagen</h3>
+                    <div className="space-y-2">
+                      {upcomingTasks.map(task => {
+                        const cat = categories.find(c => c._id === task.category);
+                        return (
+                          <div key={task._id} className="flex items-center gap-3 bg-white/60 dark:bg-gray-700/60 rounded-lg px-3 py-2">
+                            {cat && <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />}
+                            <span className="font-medium text-gray-800 dark:text-gray-200 flex-1 text-sm">{task.title}</span>
+                            <span className="text-xs text-gray-600 dark:text-gray-400">{formatDate(task.deadline)}</span>
+                            {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && selectedHousehold?.memberDetails && (
+                              <span className="text-xs text-indigo-600 dark:text-indigo-400">
+                                {task.assignedTo.map(uid => selectedHousehold.memberDetails.find(m => m._id === uid)?.name || '?').join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Aktive Aufgaben - Gruppiert nach Kategorien */}
             <div>
             <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
               Aktive Aufgaben ({activeTasks.length})
@@ -2651,117 +3010,175 @@ export default function HouseholdPlanner() {
                 <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Gut gemacht! 🎉</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {sortedActiveTasks.map(task => {
-                  const category = categories.find(cat => cat._id === task.category);
-                  const deadlineStatus = getDeadlineStatus(task.deadline);
-                  const isOverdue = deadlineStatus === 'overdue';
-                  
-                  return (
-                    <div
-                      key={task._id}
-                      className={`bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-all ${
-                        isOverdue ? 'border-2 border-red-500 bg-red-50 dark:bg-red-900/20 dark:border-red-400' : ''
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        {isOverdue && (
-                          <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-1 animate-pulse" />
-                        )}
+              <div className="space-y-4">
+                {(() => {
+                  // Group tasks by category
+                  const grouped = {};
+                  const uncategorized = [];
+                  sortedActiveTasks.forEach(task => {
+                    if (task.category) {
+                      if (!grouped[task.category]) grouped[task.category] = [];
+                      grouped[task.category].push(task);
+                    } else {
+                      uncategorized.push(task);
+                    }
+                  });
 
-                        <button
-                          onClick={() => toggleTask(task)}
-                          className={`mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
-                            task.completed
-                              ? 'bg-green-500 border-green-500'
-                              : 'border-gray-300 dark:border-gray-600 hover:border-green-500'
-                          }`}
-                        >
-                          {task.completed && <Check className="w-4 h-4 text-white" />}
-                        </button>
+                  const categoryOrder = categories.filter(cat => grouped[cat._id]);
 
-                        <div className="flex-1 min-w-0">
-                          <h3 className={`font-medium ${isOverdue ? 'text-red-700 dark:text-red-400 font-bold' : 'text-gray-800 dark:text-gray-100'}`}>
-                            {task.title}
-                          </h3>
-                          <div className="flex flex-wrap items-center gap-2 mt-2">
-                            {category && (
-                              <span
-                                className="px-3 py-1 rounded-full text-xs font-medium text-white"
-                                style={{ backgroundColor: category.color }}
-                              >
-                                {category.name}
-                              </span>
-                            )}
-                            {task.priority && (
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' :
-                                task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100' :
-                                'bg-yellow-100 text-yellow-700 dark:bg-yellow-600 dark:text-yellow-100'
-                              }`}>
-                                {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
-                              </span>
-                            )}
-                            {task.deadline && (
-                              <div className="flex items-center gap-1 text-xs">
-                                <Bell className={`w-3 h-3 ${
-                                  deadlineStatus === 'overdue' ? 'text-red-500' :
-                                  deadlineStatus === 'soon' ? 'text-orange-500' : 'text-gray-600 dark:text-gray-400'
-                                }`} />
-                                <span className={
-                                  deadlineStatus === 'overdue' ? 'text-red-500 font-bold' :
-                                  deadlineStatus === 'soon' ? 'text-orange-500 font-medium' : 'text-gray-600 dark:text-gray-400'
-                                }>
-                                  {formatDate(task.deadline)}
-                                  {isOverdue && ' - ÜBERFÄLLIG!'}
+                  const renderTask = (task) => {
+                    const category = categories.find(cat => cat._id === task.category);
+                    const deadlineStatus = getDeadlineStatus(task.deadline);
+                    const isOverdue = deadlineStatus === 'overdue';
+
+                    return (
+                      <div
+                        key={task._id}
+                        className={`p-4 transition-all ${
+                          isOverdue ? 'border-l-4 border-red-500 bg-red-50 dark:bg-red-900/20' : ''
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          {isOverdue && (
+                            <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-1 animate-pulse" />
+                          )}
+                          <button
+                            onClick={() => toggleTask(task)}
+                            className={`mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                              task.completed
+                                ? 'bg-green-500 border-green-500'
+                                : 'border-gray-300 dark:border-gray-600 hover:border-green-500'
+                            }`}
+                          >
+                            {task.completed && <Check className="w-4 h-4 text-white" />}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <h3 className={`font-medium ${isOverdue ? 'text-red-700 dark:text-red-400 font-bold' : 'text-gray-800 dark:text-gray-100'}`}>
+                              {task.title}
+                            </h3>
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                              {task.priority && (
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                  task.priority === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' :
+                                  task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100' :
+                                  'bg-yellow-100 text-yellow-700 dark:bg-yellow-600 dark:text-yellow-100'
+                                }`}>
+                                  {task.priority === 'low' ? 'Niedrig' : task.priority === 'high' ? 'Hoch' : 'Mittel'}
                                 </span>
-                              </div>
-                            )}
-                            {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && selectedHousehold?.memberDetails && (
-                              <div className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400">
-                                <Users className="w-3 h-3" />
-                                <span>
-                                  {task.assignedTo.map(userId =>
-                                    selectedHousehold.memberDetails.find(m => m._id === userId)?.name || 'Unbekannt'
-                                  ).join(', ')}
-                                </span>
-                              </div>
-                            )}
-                            {task.recurrence?.enabled && (
-                              <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400" title="Wiederkehrende Aufgabe">
-                                <RefreshCw className="w-3 h-3" />
-                                <span>
-                                  {task.recurrence.frequency === 'daily' ? 'Täglich' :
-                                   task.recurrence.frequency === 'weekly' ? 'Wöchentlich' : 'Monatlich'}
-                                </span>
+                              )}
+                              {task.deadline && (
+                                <div className="flex items-center gap-1 text-xs">
+                                  <Bell className={`w-3 h-3 ${
+                                    deadlineStatus === 'overdue' ? 'text-red-500' :
+                                    deadlineStatus === 'soon' ? 'text-orange-500' : 'text-gray-600 dark:text-gray-400'
+                                  }`} />
+                                  <span className={
+                                    deadlineStatus === 'overdue' ? 'text-red-500 font-bold' :
+                                    deadlineStatus === 'soon' ? 'text-orange-500 font-medium' : 'text-gray-600 dark:text-gray-400'
+                                  }>
+                                    {formatDate(task.deadline)}
+                                    {isOverdue && ' - ÜBERFÄLLIG!'}
+                                  </span>
+                                </div>
+                              )}
+                              {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && selectedHousehold?.memberDetails && (
+                                <div className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400">
+                                  <Users className="w-3 h-3" />
+                                  <span>
+                                    {task.assignedTo.map(userId =>
+                                      selectedHousehold.memberDetails.find(m => m._id === userId)?.name || 'Unbekannt'
+                                    ).join(', ')}
+                                  </span>
+                                </div>
+                              )}
+                              {task.recurrence?.enabled && (
+                                <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400" title="Wiederkehrende Aufgabe">
+                                  <RefreshCw className="w-3 h-3" />
+                                  <span>
+                                    {task.recurrence.frequency === 'daily' ? 'Täglich' :
+                                     task.recurrence.frequency === 'weekly' ? 'Wöchentlich' : 'Monatlich'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            {task.description && (
+                              <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded p-2">
+                                {task.description}
                               </div>
                             )}
                           </div>
-                          {task.description && (
-                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded p-2">
-                              {task.description}
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openEditTask(task)}
+                              className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
+                            >
+                              <Edit2 className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => deleteTask(task._id)}
+                              className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <>
+                      {categoryOrder.map(cat => {
+                        const catTasks = grouped[cat._id];
+                        const isCollapsed = collapsedCategories[cat._id];
+                        return (
+                          <div key={cat._id} className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+                            <button
+                              onClick={() => toggleCategoryCollapse(cat._id)}
+                              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            >
+                              <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
+                              <h3 className="font-semibold text-gray-800 dark:text-gray-100 flex-1 text-left">{cat.name}</h3>
+                              <span className="text-sm text-gray-500 dark:text-gray-400">{catTasks.length} Aufgaben</span>
+                              {isCollapsed ? (
+                                <ChevronDown className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                              ) : (
+                                <ChevronUp className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                              )}
+                            </button>
+                            {!isCollapsed && (
+                              <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                                {catTasks.map(renderTask)}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {uncategorized.length > 0 && (
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+                          <button
+                            onClick={() => toggleCategoryCollapse('uncategorized')}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <div className="w-4 h-4 rounded-full flex-shrink-0 bg-gray-400" />
+                            <h3 className="font-semibold text-gray-800 dark:text-gray-100 flex-1 text-left">Ohne Kategorie</h3>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">{uncategorized.length} Aufgaben</span>
+                            {collapsedCategories['uncategorized'] ? (
+                              <ChevronDown className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                            ) : (
+                              <ChevronUp className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                            )}
+                          </button>
+                          {!collapsedCategories['uncategorized'] && (
+                            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                              {uncategorized.map(renderTask)}
                             </div>
                           )}
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openEditTask(task)}
-                            className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
-                          >
-                            <Edit2 className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => deleteTask(task._id)}
-                            className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                      )}
+                    </>
                   );
-                })}
+                })()}
               </div>
             )}
           </div>
