@@ -2,6 +2,8 @@
 
 Eine moderne Web-App zur Verwaltung von Haushaltsaufgaben mit Mehrbenutzer-Haushalten, Kategorien, Deadlines, wiederkehrenden Aufgaben und Push-Benachrichtigungen. Self-Hosting-frei: die Server-URL wird direkt in der App konfiguriert.
 
+**Android-App verfuegbar:** Die aktuelle APK wird bei jedem Push automatisch gebaut und kann unter [Actions](../../actions) heruntergeladen werden.
+
 ## Features
 
 - Benutzer-Authentifizierung (Login/Registrierung) mit Input-Validierung
