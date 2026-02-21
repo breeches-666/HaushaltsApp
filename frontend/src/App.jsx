@@ -320,9 +320,18 @@ export default function HouseholdPlanner() {
   // QR-Code scannen für Terminal-Modus
   const scanQRCode = async () => {
     try {
+      // Prüfe ob Google Barcode Scanner Modul verfügbar ist
+      const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
+      if (!available) {
+        alert('Barcode-Scanner wird heruntergeladen. Bitte warte einen Moment und versuche es erneut.');
+        await BarcodeScanner.installGoogleBarcodeScannerModule();
+        return;
+      }
+
+      // Kamera-Berechtigung prüfen
       const { camera } = await BarcodeScanner.checkPermissions();
       if (camera === 'denied') {
-        alert('Kamera-Berechtigung wird benötigt um QR-Codes zu scannen.');
+        alert('Kamera-Berechtigung wird benötigt um QR-Codes zu scannen. Bitte in den App-Einstellungen aktivieren.');
         return;
       }
       if (camera !== 'granted') {
@@ -355,7 +364,7 @@ export default function HouseholdPlanner() {
       }
     } catch (error) {
       console.error('QR-Code Scan Fehler:', error);
-      alert('Fehler beim Scannen des QR-Codes.');
+      alert('QR-Code Scan Fehler: ' + (error.message || error));
     }
   };
 
