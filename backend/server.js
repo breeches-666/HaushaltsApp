@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const admin = require('firebase-admin');
 const cron = require('node-cron');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
@@ -41,7 +42,30 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
+
+// Rate Limiting
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 Minuten
+  max: 10,
+  message: { error: 'Zu viele Anmeldeversuche. Bitte versuche es in 15 Minuten erneut.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 Stunde
+  max: 5,
+  message: { error: 'Zu viele Registrierungsversuche. Bitte versuche es in einer Stunde erneut.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 Minute
+  max: 100,
+  message: { error: 'Zu viele Anfragen. Bitte versuche es später erneut.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/haushaltsplaner')
@@ -224,10 +248,24 @@ const sendPushNotification = async (userId, title, body, data = {}) => {
   }
 };
 
+// Rate Limiting für alle API-Routen
+app.use('/api/', apiLimiter);
+
 // Auth Routes
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', registerLimiter, async (req, res) => {
   try {
     const { name, email, password } = req.body;
+
+    // Input-Validierung
+    if (!name || typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 50) {
+      return res.status(400).json({ error: 'Name muss zwischen 2 und 50 Zeichen lang sein' });
+    }
+    if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Ungültige E-Mail-Adresse' });
+    }
+    if (!password || typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({ error: 'Passwort muss mindestens 8 Zeichen lang sein' });
+    }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -280,7 +318,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -863,8 +901,14 @@ app.post('/api/tasks', authenticateAny, async (req, res) => {
     }
 
     const task = new Task({
-      ...req.body,
-      householdId
+      householdId,
+      title: req.body.title,
+      category: req.body.category,
+      deadline: req.body.deadline,
+      assignedTo: req.body.assignedTo,
+      priority: req.body.priority,
+      description: req.body.description,
+      recurrence: req.body.recurrence
     });
     await task.save();
 
@@ -949,7 +993,10 @@ app.put('/api/tasks/:id', authenticateAny, async (req, res) => {
       }
     }
 
-    Object.assign(task, req.body);
+    const allowedFields = ['title', 'category', 'deadline', 'assignedTo', 'completed', 'completedAt', 'completedBy', 'priority', 'description', 'recurrence', 'archived'];
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) task[field] = req.body[field];
+    }
     await task.save();
 
     // Wiederkehrende Aufgaben: Erstelle neue Task wenn completed und recurrence aktiviert
@@ -1091,8 +1138,9 @@ app.post('/api/categories', authenticateToken, async (req, res) => {
     }
 
     const category = new Category({
-      ...req.body,
-      householdId
+      householdId,
+      name: req.body.name,
+      color: req.body.color
     });
     await category.save();
     res.json(category);
