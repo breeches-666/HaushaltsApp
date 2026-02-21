@@ -1,65 +1,89 @@
-# 🏠 Haushaltsplaner App
+# Haushaltsplaner App
 
-Eine moderne Progressive Web App (PWA) zur Verwaltung von Haushaltsaufgaben mit Kategorien, Deadlines und Benachrichtigungen.
+Eine moderne Web-App zur Verwaltung von Haushaltsaufgaben mit Mehrbenutzer-Haushalten, Kategorien, Deadlines, wiederkehrenden Aufgaben und Push-Benachrichtigungen. Self-Hosting-frei: die Server-URL wird direkt in der App konfiguriert.
 
-## ✨ Features
+## Features
 
-- 👤 Benutzer-Authentifizierung (Login/Register)
-- ✅ Aufgaben mit Checkboxen
-- 📁 Individuelle Kategorien mit Farben
-- ⏰ Deadlines mit automatischen Benachrichtigungen
-- 🔔 Push-Benachrichtigungen (1h vorher + bei Überschreitung)
-- 📱 Als Android/iOS App installierbar (PWA)
-- 🐳 Docker-Support für einfaches Deployment
+- Benutzer-Authentifizierung (Login/Registrierung) mit Input-Validierung
+- Mehrere Haushalte pro Benutzer, Einladungssystem per E-Mail
+- Aufgaben mit Kategorien, Deadlines, Prioritaeten und Beschreibungen
+- Wiederkehrende Aufgaben (taeglich, woechentlich, monatlich)
+- Mehrfachzuweisung von Aufgaben an Haushaltsmitglieder
+- Push-Benachrichtigungen (Firebase Cloud Messaging) fuer Deadlines und Zuweisungen
+- Terminal-Modus: Geteiltes Dashboard per QR-Code (z.B. fuer ein Tablet in der Kueche)
+- Dark Mode
+- Aufgaben-Archiv und Statistiken
+- Rate Limiting und Security Hardening
+- Docker-Support fuer einfaches Self-Hosting
+- Android-App via Capacitor (APK)
 
-## 🚀 Schnellstart
+## Schnellstart
 
 ### Voraussetzungen
 
-- Node.js 18+
 - Docker & Docker Compose
-- Git
+- Optional: Node.js 18+ (fuer Frontend-Entwicklung)
 
 ### Installation
 
-1. Repository klonen:
 ```bash
-git clone https://github.com/dein-username/HaushaltsApp.git
+git clone https://github.com/breeches-666/HaushaltsApp.git
 cd HaushaltsApp
+
+# .env konfigurieren
+cp backend/.env.example backend/.env
+nano backend/.env  # JWT_SECRET aendern!
+
+# Container starten
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-2. Backend starten:
-```bash
-docker compose up -d
-```
+Das Backend laeuft dann auf `http://localhost:3000`. Im Frontend wird die Server-URL beim Login eingegeben.
 
-3. Frontend entwickeln:
+### Frontend entwickeln
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-4. App öffnen: `http://localhost:5173`
+App oeffnen: `http://localhost:5173`
 
-## 📦 Produktion Deployment
+## Environment-Variablen
+
+Alle Konfiguration erfolgt ueber die Datei `backend/.env`. Eine Vorlage liegt in `backend/.env.example`.
+
+| Variable | Pflicht | Standard | Beschreibung |
+|---|---|---|---|
+| `JWT_SECRET` | Ja | - | Geheimer Schluessel fuer JWT-Token-Signierung. Muss ein langer, zufaelliger String sein. Generieren mit: `openssl rand -hex 64` |
+| `MONGODB_URI` | Nein | `mongodb://mongo:27017/haushaltsplaner` | MongoDB-Verbindungsstring. Bei Docker Compose auf `mongo` als Hostname belassen. |
+| `PORT` | Nein | `3000` | Port, auf dem das Backend lauscht. |
+| `NODE_ENV` | Nein | `production` | Node.js Environment. `production` fuer Deployment, `development` fuer lokale Entwicklung. |
+| `FRONTEND_URL` | Nein | `*` | Erlaubte CORS-Origins. `*` erlaubt alle Origins (da JWT-basiert, nicht Cookie-basiert). Kann auf eine spezifische Domain eingeschraenkt werden. |
+| `FIREBASE_SERVICE_ACCOUNT` | Nein | - | Firebase Service Account JSON als einzeiliger String fuer Push-Benachrichtigungen. Ohne diese Variable sind Push-Notifications deaktiviert. Siehe [FIREBASE-SETUP.md](FIREBASE-SETUP.md). |
+
+### JWT_SECRET generieren
+
+```bash
+openssl rand -hex 64
+```
+
+Diesen Wert in `backend/.env` als `JWT_SECRET` eintragen. **Niemals den Beispielwert aus `.env.example` in Produktion verwenden.**
+
+## Produktion Deployment
 
 ### Schnell-Deployment mit Script
 
 ```bash
-# Automatisches Deployment
 ./deploy-server.sh
 ```
 
-Das Script führt automatisch aus:
-- Erstellt .env Datei mit sicherem JWT_SECRET
-- Baut Docker Images
-- Startet Container
-- Prüft Health Status
+Das Script erstellt automatisch eine `.env` mit sicherem JWT_SECRET, baut Docker Images, startet Container und prueft den Health Status.
 
-### Backend auf Server deployen
+### Manuelles Deployment
 
-**Vollständige Anleitung:** Siehe [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.md)
+Vollstaendige Anleitung: Siehe [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.md)
 
 **Kurzversion:**
 
@@ -72,17 +96,16 @@ git clone https://github.com/breeches-666/HaushaltsApp.git
 cd HaushaltsApp
 
 # 3. .env konfigurieren
-cd backend
-cp .env.example .env
-nano .env  # JWT_SECRET ändern!
+cp backend/.env.example backend/.env
+nano backend/.env  # JWT_SECRET aendern!
 
-# 4. Container starten
-cd ..
-docker compose up -d
+# 4. Container starten (Produktion)
+docker compose -f docker-compose.prod.yml up -d
 
 # 5. Nginx als Reverse Proxy (optional aber empfohlen)
 sudo cp nginx/haushaltsapp-backend.conf /etc/nginx/sites-available/
 sudo ln -s /etc/nginx/sites-available/haushaltsapp-backend.conf /etc/nginx/sites-enabled/
+# Domain in der Nginx-Config anpassen!
 sudo nginx -t
 sudo systemctl restart nginx
 
@@ -92,7 +115,7 @@ sudo certbot --nginx -d your-domain.example.com
 
 ### Frontend deployen
 
-**Option 1: Netlify/Vercel (empfohlen)**
+**Option 1: Netlify/Vercel**
 - Repository verbinden
 - Build Command: `cd frontend && npm run build`
 - Publish Directory: `frontend/dist`
@@ -106,19 +129,31 @@ npm run build
 # dist/ Ordner auf Server kopieren und mit Nginx servieren
 ```
 
-## 🔒 Sicherheit
+### Docker Compose Varianten
 
-- Passwörter werden mit bcrypt gehasht
+| Datei | Verwendung |
+|---|---|
+| `docker-compose.yml` | Entwicklung: MongoDB-Port offen, Mongo Express auf Port 8081 |
+| `docker-compose.prod.yml` | Produktion: MongoDB nur intern, Health Check, ohne Mongo Express |
+| `docker-compose.secure.yml` | Produktion mit MongoDB-Authentifizierung |
+
+## Sicherheit
+
+- Passwoerter mit bcrypt gehasht (Salt Rounds: 10)
 - JWT-basierte Authentifizierung
-- CORS-Schutz
-- Input-Validierung
+- Rate Limiting: Login (10/15min), Registrierung (5/1h), API (100/min)
+- Input-Validierung bei Registrierung (E-Mail-Format, Passwort min. 8 Zeichen)
+- Mass-Assignment-Schutz durch Field-Whitelisting
+- JSON Body-Limit (1 MB)
+- Terminal-Modus mit separatem Token-System
 
-## 🛠️ Technologie-Stack
+## Technologie-Stack
 
 **Frontend:**
 - React 18
 - Tailwind CSS
 - Vite
+- Capacitor (Android-App)
 - Lucide Icons
 
 **Backend:**
@@ -126,62 +161,76 @@ npm run build
 - MongoDB + Mongoose
 - JWT Authentication
 - bcrypt
+- Firebase Admin SDK (Push-Benachrichtigungen)
+- express-rate-limit
+- node-cron (Deadline-Benachrichtigungen)
 
 **DevOps:**
 - Docker & Docker Compose
-- Nginx (optional)
+- Nginx (Reverse Proxy)
 
-## 📱 PWA Installation
+## API Endpoints
 
-### Android:
-1. Chrome öffnen
-2. Menü (⋮) → "App installieren"
-3. Fertig!
-
-### iOS:
-1. Safari öffnen
-2. Teilen-Button → "Zum Home-Bildschirm"
-3. Fertig!
-
-## 🔧 Entwicklung
-
-### API Endpoints
-
-POST   /api/register        - Registrierung
-POST   /api/login           - Login
-GET    /api/tasks           - Alle Aufgaben
-POST   /api/tasks           - Aufgabe erstellen
-PUT    /api/tasks/:id       - Aufgabe aktualisieren
-DELETE /api/tasks/:id       - Aufgabe löschen
-GET    /api/categories      - Alle Kategorien
-POST   /api/categories      - Kategorie erstellen
-DELETE /api/categories/:id  - Kategorie löschen
-
-### Environment Variables
-
-**Backend (.env):**
-```env
-JWT_SECRET=dein-geheimer-schluessel
-MONGODB_URI=mongodb://mongo:27017/haushaltsplaner
-FRONTEND_URL=https://deine-domain.de
-PORT=3000
+### Authentifizierung
+```
+POST   /api/register                          Registrierung (rate limited)
+POST   /api/login                             Login (rate limited)
 ```
 
-## 📝 TODO
+### Benutzer
+```
+POST   /api/user/fcm-token                    FCM-Token registrieren
+GET    /api/user/notification-preferences      Benachrichtigungseinstellungen laden
+PUT    /api/user/notification-preferences      Benachrichtigungseinstellungen aendern
+```
 
-- [ ] E-Mail Benachrichtigungen
-- [ ] Aufgaben teilen zwischen Benutzern
-- [ ] Wiederkehrende Aufgaben
-- [ ] Dark Mode
-- [ ] Export/Import Funktion
+### Haushalte
+```
+GET    /api/households                         Alle Haushalte des Benutzers
+POST   /api/households                         Haushalt erstellen
+DELETE /api/households/:id                     Haushalt loeschen
+POST   /api/households/:id/invite              Mitglied einladen
+GET    /api/households/invites                 Einladungen anzeigen
+POST   /api/households/:id/accept              Einladung annehmen
+POST   /api/households/:id/decline             Einladung ablehnen
+DELETE /api/households/:hId/members/:uId       Mitglied entfernen
+POST   /api/households/:id/terminal-token      Terminal-Token generieren
+DELETE /api/households/:id/terminal-token      Terminal-Token loeschen
+```
 
-## 📄 Lizenz
+### Aufgaben
+```
+GET    /api/tasks?householdId=...              Aufgaben laden
+POST   /api/tasks                              Aufgabe erstellen
+PUT    /api/tasks/:id                          Aufgabe aktualisieren
+DELETE /api/tasks/:id                          Aufgabe loeschen
+GET    /api/tasks/calendar?householdId=...     Kalenderansicht
+GET    /api/tasks/archived?householdId=...     Archivierte Aufgaben
+GET    /api/tasks/statistics?householdId=...   Statistiken
+```
+
+### Kategorien
+```
+GET    /api/categories?householdId=...         Kategorien laden
+POST   /api/categories                         Kategorie erstellen
+PUT    /api/categories/:id                     Kategorie aktualisieren
+DELETE /api/categories/:id                     Kategorie loeschen
+```
+
+### Terminal-Modus
+```
+GET    /api/terminal/auth                      Terminal authentifizieren
+```
+
+### System
+```
+GET    /health                                 Health Check
+```
+
+## Android APK bauen
+
+Siehe [APK-BUILD.md](APK-BUILD.md) fuer die vollstaendige Anleitung zum Erstellen der Android-App mit Capacitor.
+
+## Lizenz
 
 MIT License - siehe [LICENSE](LICENSE) Datei
-
-## 🤝 Beitragen
-
-Pull Requests sind willkommen! Für größere Änderungen bitte zuerst ein Issue öffnen.
-
-## 👨‍💻 Autor
-DK
