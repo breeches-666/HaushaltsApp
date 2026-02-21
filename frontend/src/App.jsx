@@ -987,6 +987,22 @@ export default function HouseholdPlanner() {
     }
   };
 
+  const terminalUncompleteTask = async (taskId) => {
+    try {
+      const res = await fetch(`${API_URL}/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${terminalToken}` },
+        body: JSON.stringify({ completed: false, completedBy: null })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setTerminalTasks(prev => prev.map(t => t._id === updated._id ? updated : t));
+      }
+    } catch (error) {
+      console.error('Fehler beim Wiederherstellen:', error);
+    }
+  };
+
   const terminalDeleteTask = async (taskId) => {
     if (!confirm('Aufgabe wirklich löschen?')) return;
     try {
@@ -1176,6 +1192,7 @@ export default function HouseholdPlanner() {
     const diff = deadlineDate - now;
     const oneHour = 60 * 60 * 1000;
 
+    if (diff < -oneHour) return 'overdue-long';
     if (diff < 0) return 'overdue';
     if (diff <= oneHour) return 'soon';
     return 'ok';
@@ -1384,11 +1401,15 @@ export default function HouseholdPlanner() {
                             <div key={task._id} className="flex items-center gap-2 text-sm">
                               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${task.priority === 'high' ? 'bg-red-400' : task.priority === 'medium' ? 'bg-yellow-400' : 'bg-blue-400'}`}></span>
                               <span className="text-gray-200 truncate">{task.title}</span>
-                              {task.deadline && (
-                                <span className={`ml-auto text-xs flex-shrink-0 ${getDeadlineStatus(task.deadline) === 'overdue' ? 'text-red-400' : 'text-gray-500'}`}>
-                                  {formatDate(task.deadline)}
-                                </span>
-                              )}
+                              {task.deadline && (() => {
+                                const dlS = getDeadlineStatus(task.deadline);
+                                const dlC = dlS === 'soon' ? 'text-yellow-400' : (dlS === 'overdue' || dlS === 'overdue-long') ? 'text-red-400' : 'text-gray-500';
+                                return (
+                                  <span className={`ml-auto text-xs flex-shrink-0 ${dlC}`}>
+                                    {formatDate(task.deadline)}{dlS === 'overdue-long' ? ' !' : ''}
+                                  </span>
+                                );
+                              })()}
                             </div>
                           ))}
                         </div>
@@ -1414,11 +1435,15 @@ export default function HouseholdPlanner() {
                             <div key={task._id} className="flex items-center gap-2 text-sm">
                               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${task.priority === 'high' ? 'bg-red-400' : task.priority === 'medium' ? 'bg-yellow-400' : 'bg-blue-400'}`}></span>
                               <span className="text-gray-200 truncate">{task.title}</span>
-                              {task.deadline && (
-                                <span className={`ml-auto text-xs flex-shrink-0 ${getDeadlineStatus(task.deadline) === 'overdue' ? 'text-red-400' : 'text-gray-500'}`}>
-                                  {formatDate(task.deadline)}
-                                </span>
-                              )}
+                              {task.deadline && (() => {
+                                const dlS = getDeadlineStatus(task.deadline);
+                                const dlC = dlS === 'soon' ? 'text-yellow-400' : (dlS === 'overdue' || dlS === 'overdue-long') ? 'text-red-400' : 'text-gray-500';
+                                return (
+                                  <span className={`ml-auto text-xs flex-shrink-0 ${dlC}`}>
+                                    {formatDate(task.deadline)}{dlS === 'overdue-long' ? ' !' : ''}
+                                  </span>
+                                );
+                              })()}
                             </div>
                           ))}
                         </div>
@@ -1482,14 +1507,25 @@ export default function HouseholdPlanner() {
                       {catTasks.length === 0 ? (
                         <p className="text-gray-500 text-xs text-center py-3">Keine Aufgaben</p>
                       ) : (
-                        catTasks.map(task => (
-                          <div key={task._id} className="flex items-center gap-2 rounded-lg p-2 bg-gray-700">
+                        catTasks.map(task => {
+                          const dlStatus = getDeadlineStatus(task.deadline);
+                          const rowBg = dlStatus === 'soon' ? 'bg-yellow-900/40 border border-yellow-600/50'
+                            : (dlStatus === 'overdue' || dlStatus === 'overdue-long') ? 'bg-red-900/40 border border-red-600/50'
+                            : 'bg-gray-700';
+                          const dlTextClass = dlStatus === 'soon' ? 'text-yellow-400 font-medium'
+                            : (dlStatus === 'overdue' || dlStatus === 'overdue-long') ? 'text-red-400 font-medium'
+                            : 'text-gray-400';
+                          return (
+                          <div key={task._id} className={`flex items-center gap-2 rounded-lg p-2 ${rowBg}`}>
                             <button
                               onClick={() => terminalRequestCompleteTask(task)}
                               className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-600 hover:bg-green-500 text-white flex items-center justify-center transition-colors active:scale-95"
                             >
                               <Check className="w-5 h-5" />
                             </button>
+                            {dlStatus === 'overdue-long' && (
+                              <span className="text-red-500 font-bold text-xl flex-shrink-0">!</span>
+                            )}
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-white leading-tight truncate">{task.title}</p>
                               <div className="flex items-center gap-2 mt-0.5">
@@ -1499,8 +1535,8 @@ export default function HouseholdPlanner() {
                                   </span>
                                 )}
                                 {task.deadline && (
-                                  <span className={`text-xs flex-shrink-0 ${getDeadlineStatus(task.deadline) === 'overdue' ? 'text-red-400 font-medium' : 'text-gray-400'}`}>
-                                    {formatDate(task.deadline)}{getDeadlineStatus(task.deadline) === 'overdue' ? ' !' : ''}
+                                  <span className={`text-xs flex-shrink-0 ${dlTextClass}`}>
+                                    {formatDate(task.deadline)}{(dlStatus === 'overdue' || dlStatus === 'overdue-long') ? ' !' : ''}
                                   </span>
                                 )}
                               </div>
@@ -1518,7 +1554,7 @@ export default function HouseholdPlanner() {
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
-                        ))
+                        );})
                       )}
                     </div>
                   )}
@@ -1548,6 +1584,13 @@ export default function HouseholdPlanner() {
                         {task.completedAt && (
                           <span className="text-xs text-gray-500 flex-shrink-0">{formatDate(task.completedAt)}</span>
                         )}
+                        <button
+                          onClick={() => terminalUncompleteTask(task._id)}
+                          className="flex-shrink-0 w-8 h-8 rounded-lg bg-green-900/40 hover:bg-green-900/70 flex items-center justify-center text-green-400 transition-colors"
+                          title="Wiederherstellen"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => terminalDeleteTask(task._id)}
                           className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-900/40 hover:bg-red-900/70 flex items-center justify-center text-red-400 transition-colors"

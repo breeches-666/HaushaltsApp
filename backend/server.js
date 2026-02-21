@@ -1245,28 +1245,47 @@ cron.schedule('* * * * *', async () => {
         const households = await Household.find({ members: user._id.toString() });
 
         let totalTodayTasks = 0;
+        let totalOverdueTasks = 0;
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
-        // Zähle alle heutigen Aufgaben über alle Haushalte
+        // Zähle nur dem Benutzer zugewiesene Aufgaben über alle Haushalte
         for (const household of households) {
           const todayTasks = await Task.countDocuments({
             householdId: household._id.toString(),
             completed: false,
             archived: false,
+            assignedTo: user._id.toString(),
             deadline: { $gte: todayStart, $lte: todayEnd }
           });
           totalTodayTasks += todayTasks;
+
+          const overdueTasks = await Task.countDocuments({
+            householdId: household._id.toString(),
+            completed: false,
+            archived: false,
+            assignedTo: user._id.toString(),
+            deadline: { $lt: todayStart }
+          });
+          totalOverdueTasks += overdueTasks;
         }
 
-        // Sende Benachrichtigung nur wenn es heutige Aufgaben gibt
-        if (totalTodayTasks > 0) {
-          const taskWord = totalTodayTasks === 1 ? 'Aufgabe' : 'Aufgaben';
+        // Sende Benachrichtigung nur wenn es heutige oder überfällige Aufgaben gibt
+        if (totalTodayTasks > 0 || totalOverdueTasks > 0) {
+          const parts = [];
+          if (totalTodayTasks > 0) {
+            const taskWord = totalTodayTasks === 1 ? 'Aufgabe' : 'Aufgaben';
+            parts.push(`${totalTodayTasks} ${taskWord} für heute`);
+          }
+          if (totalOverdueTasks > 0) {
+            const overdueWord = totalOverdueTasks === 1 ? 'überfällige Aufgabe' : 'überfällige Aufgaben';
+            parts.push(`${totalOverdueTasks} ${overdueWord}`);
+          }
           await sendPushNotification(
             user._id.toString(),
             '📋 Heutige Aufgaben',
-            `Du hast ${totalTodayTasks} ${taskWord} für heute`,
-            { type: 'daily_reminder', count: totalTodayTasks.toString() }
+            `Du hast ${parts.join(' und ')}`,
+            { type: 'daily_reminder', count: (totalTodayTasks + totalOverdueTasks).toString() }
           );
         }
       } catch (userError) {
