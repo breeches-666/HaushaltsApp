@@ -60,13 +60,6 @@ const registerLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false
 });
-const apiLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 Minute
-  max: 300,
-  message: { error: 'Zu viele Anfragen. Bitte versuche es später erneut.' },
-  standardHeaders: true,
-  legacyHeaders: false
-});
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/haushaltsplaner')
@@ -249,8 +242,6 @@ const sendPushNotification = async (userId, title, body, data = {}) => {
   }
 };
 
-// Rate Limiting für alle API-Routen
-app.use('/api/', apiLimiter);
 
 // Auth Routes
 app.post('/api/register', registerLimiter, async (req, res) => {
