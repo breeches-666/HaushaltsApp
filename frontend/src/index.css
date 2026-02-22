@@ -1,3 +1,86 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Neomorphism Base Styles */
+@layer base {
+  body {
+    @apply bg-[#e0e0e0] dark:bg-[#1e1e2e];
+  }
+}
+
+/* Modal Animations */
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modal-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes modal-scale-in {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes modal-scale-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.95) translateY(10px); }
+}
+
+.modal-backdrop {
+  animation: modal-fade-in 0.2s ease-out;
+}
+.modal-content {
+  animation: modal-scale-in 0.2s ease-out;
+}
+
+/* Checkbox Bounce Animation */
+@keyframes checkbox-bounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.25); }
+  50% { transform: scale(0.9); }
+  70% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+.checkbox-bounce {
+  animation: checkbox-bounce 0.35s ease-in-out;
+}
+
+/* Button Press Effect */
+.btn-neo {
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+.btn-neo:active {
+  transform: scale(0.97);
+}
+
+/* Card Hover Lift */
+.card-neo {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-neo:hover {
+  transform: translateY(-2px);
+}
+
+/* View Transition */
+@keyframes view-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.view-transition {
+  animation: view-fade-in 0.25s ease-out;
+}
+
+/* Safe area padding for bottom nav */
+.pb-safe {
+  padding-bottom: max(5rem, calc(5rem + env(safe-area-inset-bottom)));
+}
+
+/* Tab transition */
+@keyframes tab-slide-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.tab-content {
+  animation: tab-slide-in 0.2s ease-out;
+}

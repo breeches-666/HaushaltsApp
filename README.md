@@ -1,6 +1,6 @@
 # Haushaltsplaner App
 
-Eine moderne Web-App zur Verwaltung von Haushaltsaufgaben mit Mehrbenutzer-Haushalten, Kategorien, Deadlines, wiederkehrenden Aufgaben und Push-Benachrichtigungen. Designed fuer Self-Hosting: die Server-URL wird direkt in der App konfiguriert.
+Eine Android-App zur Verwaltung von Haushaltsaufgaben mit Mehrbenutzer-Haushalten, Kategorien, Deadlines, wiederkehrenden Aufgaben und Push-Benachrichtigungen. Designed fuer Self-Hosting: das Backend wird per Docker gehostet, die Server-URL wird direkt in der App konfiguriert.
 
 **Android-App verfuegbar:** Die aktuelle APK wird bei jedem Push automatisch gebaut und kann unter [Actions](../../actions) heruntergeladen werden.
 
@@ -27,7 +27,6 @@ Eine moderne Web-App zur Verwaltung von Haushaltsaufgaben mit Mehrbenutzer-Haush
 ### Voraussetzungen
 
 - Docker & Docker Compose
-- Optional: Node.js 18+ (fuer Frontend-Entwicklung)
 
 ### Installation
 
@@ -43,17 +42,7 @@ nano backend/.env  # JWT_SECRET aendern!
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Das Backend laeuft dann auf `http://localhost:3000`. Im Frontend wird die Server-URL beim Login eingegeben.
-
-### Frontend entwickeln
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-App oeffnen: `http://localhost:5173`
+Das Backend laeuft dann auf `http://localhost:3000`. In der Android-App wird die Server-URL beim Login eingegeben.
 
 ## Environment-Variablen
 
@@ -116,22 +105,6 @@ sudo systemctl restart nginx
 
 # 6. SSL mit Let's Encrypt
 sudo certbot --nginx -d your-domain.example.com
-```
-
-### Frontend deployen
-
-**Option 1: Netlify/Vercel**
-- Repository verbinden
-- Build Command: `cd frontend && npm run build`
-- Publish Directory: `frontend/dist`
-- Die Server-URL wird in der App beim Login konfiguriert
-
-**Option 2: Eigener Server mit Nginx**
-```bash
-cd frontend
-npm install
-npm run build
-# dist/ Ordner auf Server kopieren und mit Nginx servieren
 ```
 
 ### Docker Compose Varianten

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home, RefreshCw, Archive, BarChart, CheckSquare } from 'lucide-react';
+import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home, RefreshCw, Archive, BarChart, CheckSquare, Menu } from 'lucide-react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
@@ -67,6 +67,22 @@ export default function HouseholdPlanner() {
     deadlineNotifications: true,
     taskAssignments: true
   });
+
+  // Bottom Navigation
+  const [activeTab, setActiveTab] = useState('tasks');
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'tasks') {
+      setViewMode('tasks');
+    } else if (tab === 'calendar') {
+      setShowCalendar(true);
+    } else if (tab === 'statistics') {
+      setViewMode('statistics');
+      loadStatistics();
+    } else if (tab === 'settings') {
+      // Settings rendered inline
+    }
+  };
 
   // Terminal Mode State
   const [isTerminalMode, setIsTerminalMode] = useState(false);
@@ -641,7 +657,8 @@ export default function HouseholdPlanner() {
         return;
       }
 
-      // Schließe Einstellungen
+      // Zurück zu Aufgaben
+      setActiveTab('tasks');
       setShowSettings(false);
 
       // Lade Haushalte neu
@@ -1291,6 +1308,9 @@ export default function HouseholdPlanner() {
     completedTasks = completedTasks.filter(task => task.completedBy === completedByFilter);
   }
 
+  // Sortiere erledigte Aufgaben nach Erledigungszeitpunkt (neueste oben)
+  completedTasks.sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
+
   // Sortiere aktive Aufgaben: Überfällig zuerst, dann nach Deadline
   const sortedActiveTasks = [...activeTasks].sort((a, b) => {
     const statusA = getDeadlineStatus(a.deadline);
@@ -1826,14 +1846,14 @@ export default function HouseholdPlanner() {
 
   if (showLogin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 w-full max-w-md">
+      <div className="min-h-screen bg-[#e0e0e0] dark:bg-[#1e1e2e] flex items-center justify-center p-4">
+        <div className="bg-[#e0e0e0] dark:bg-[#1e1e2e] rounded-2xl shadow-neo dark:shadow-neo-dark p-8 w-full max-w-md">
           <div className="text-center mb-8">
-            <div className="inline-block p-3 bg-indigo-100 rounded-full mb-4">
-              <User className="w-8 h-8 text-indigo-600" />
+            <div className="inline-block p-4 rounded-2xl shadow-neo dark:shadow-neo-dark mb-4">
+              <User className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
             </div>
             <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Haushaltsplaner</h1>
-            <p className="text-gray-600 mt-2">
+            <p className="text-gray-500 dark:text-gray-400 mt-2">
               {isRegistering ? 'Neues Konto erstellen' : 'Willkommen zurück'}
             </p>
           </div>
@@ -1845,7 +1865,7 @@ export default function HouseholdPlanner() {
               placeholder="https://mein-server.example.com"
               value={serverUrl}
               onChange={(e) => setServerUrl(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
             />
           </div>
 
@@ -1856,7 +1876,7 @@ export default function HouseholdPlanner() {
                 placeholder="E-Mail"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <input
                 type="password"
@@ -1864,18 +1884,18 @@ export default function HouseholdPlanner() {
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <button
                 onClick={handleLogin}
                 disabled={loading || !serverUrl}
-                className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50"
+                className="w-full bg-indigo-600 text-white py-3 rounded-xl hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50 btn-neo shadow-neo dark:shadow-neo-dark"
               >
                 {loading ? 'Lädt...' : 'Anmelden'}
               </button>
               <button
                 onClick={() => setIsRegistering(true)}
-                className="w-full text-indigo-600 py-2 hover:text-indigo-700 transition-colors"
+                className="w-full text-indigo-600 dark:text-indigo-400 py-2 hover:text-indigo-700 transition-colors"
               >
                 Noch kein Konto? Registrieren
               </button>
@@ -1887,14 +1907,14 @@ export default function HouseholdPlanner() {
                 placeholder="Name"
                 value={registerName}
                 onChange={(e) => setRegisterName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <input
                 type="email"
                 placeholder="E-Mail"
                 value={registerEmail}
                 onChange={(e) => setRegisterEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <input
                 type="password"
@@ -1902,18 +1922,18 @@ export default function HouseholdPlanner() {
                 value={registerPassword}
                 onChange={(e) => setRegisterPassword(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <button
                 onClick={handleRegister}
                 disabled={loading || !serverUrl}
-                className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50"
+                className="w-full bg-indigo-600 text-white py-3 rounded-xl hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50 btn-neo shadow-neo dark:shadow-neo-dark"
               >
                 {loading ? 'Lädt...' : 'Registrieren'}
               </button>
               <button
                 onClick={() => setIsRegistering(false)}
-                className="w-full text-indigo-600 py-2 hover:text-indigo-700 transition-colors"
+                className="w-full text-indigo-600 dark:text-indigo-400 py-2 hover:text-indigo-700 transition-colors"
               >
                 Zurück zur Anmeldung
               </button>
@@ -1921,10 +1941,10 @@ export default function HouseholdPlanner() {
           )}
 
           {Capacitor.isNativePlatform() && (
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+            <div className="mt-6 pt-4 border-t border-gray-300 dark:border-gray-600">
               <button
                 onClick={scanQRCode}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-700 transition-colors btn-neo"
               >
                 <CheckSquare className="w-5 h-5" />
                 QR-Code scannen (Terminal-Modus)
@@ -1938,8 +1958,11 @@ export default function HouseholdPlanner() {
 
   if (!selectedHousehold) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#e0e0e0] dark:bg-[#1e1e2e] flex items-center justify-center p-4">
         <div className="text-center">
+          <div className="inline-block p-4 rounded-2xl shadow-neo dark:shadow-neo-dark mb-4">
+            <RefreshCw className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-spin" />
+          </div>
           <p className="text-gray-600 dark:text-gray-400">Lade Haushalt...</p>
         </div>
       </div>
@@ -1947,72 +1970,41 @@ export default function HouseholdPlanner() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 overflow-x-hidden">
-      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 shadow-md">
+    <div className="min-h-screen bg-[#e0e0e0] dark:bg-[#1e1e2e] overflow-x-hidden pb-safe">
+      {/* Top Bar - Simplified */}
+      <div className="bg-[#e0e0e0] dark:bg-[#1e1e2e] shadow-neo-flat dark:shadow-neo-dark-flat">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-100 dark:bg-indigo-900 rounded-lg">
+              <div className="p-2 rounded-xl shadow-neo-sm dark:shadow-neo-dark-sm">
                 <Calendar className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">{selectedHousehold.name}</h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Hallo, {currentUser?.name}!</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Hallo, {currentUser?.name}!</p>
               </div>
+            </div>
+            <div className="flex items-center gap-2">
               <button
                 onClick={refreshData}
                 disabled={isRefreshing}
-                className={`p-2 rounded-lg transition-all ${
+                className={`p-2 rounded-xl shadow-neo-sm dark:shadow-neo-dark-sm transition-all btn-neo ${
                   isRefreshing
                     ? 'text-indigo-600 dark:text-indigo-400 animate-spin'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400'
                 }`}
-                title="Aktualisieren (automatisch alle 10 Sek.)"
+                title="Aktualisieren"
               >
                 <RefreshCw className="w-5 h-5" />
               </button>
-            </div>
-            <div className="flex items-center gap-2">
               {pendingInvites.length > 0 && (
-                <div className="relative">
+                <div className="relative p-2">
                   <Mail className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                     {pendingInvites.length}
                   </span>
                 </div>
               )}
-              <button
-                onClick={createSharedHousehold}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                title="Gemeinsamen Haushalt erstellen"
-              >
-                <FolderPlus className="w-5 h-5" />
-                <span className="hidden sm:inline">Gemeinsam</span>
-              </button>
-              {Capacitor.isNativePlatform() && (
-                <button
-                  onClick={scanQRCode}
-                  className="flex items-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-                  title="QR-Code scannen (Terminal-Modus)"
-                >
-                  <CheckSquare className="w-5 h-5" />
-                  <span className="hidden sm:inline">Terminal</span>
-                </button>
-              )}
-              <button
-                onClick={() => setShowSettings(true)}
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-              >
-                <Settings className="w-5 h-5" />
-                <span className="hidden sm:inline">Einstellungen</span>
-              </button>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-              >
-                <LogOut className="w-5 h-5" />
-                <span className="hidden sm:inline">Abmelden</span>
-              </button>
             </div>
           </div>
 
@@ -2023,10 +2015,10 @@ export default function HouseholdPlanner() {
                 <button
                   key={h._id}
                   onClick={() => switchHousehold(h)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all btn-neo ${
                     selectedHousehold._id === h._id
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                      ? 'bg-indigo-600 text-white shadow-neo-sm dark:shadow-neo-dark-sm'
+                      : 'shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 bg-[#e0e0e0] dark:bg-[#1e1e2e]'
                   }`}
                 >
                   <Home className="w-4 h-4" />
@@ -2044,23 +2036,23 @@ export default function HouseholdPlanner() {
 
           {/* Einladungsbenachrichtigungen */}
           {pendingInvites.length > 0 && (
-            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="font-semibold text-blue-800 mb-2">
-                📨 Du hast {pendingInvites.length} neue Einladung(en)
+            <div className="mt-4 rounded-2xl shadow-neo dark:shadow-neo-dark p-4">
+              <p className="font-semibold text-indigo-700 dark:text-indigo-400 mb-2">
+                Du hast {pendingInvites.length} neue Einladung(en)
               </p>
               {pendingInvites.map(invite => (
-                <div key={invite.householdId} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded p-3 mb-2">
+                <div key={invite.householdId} className="flex items-center justify-between rounded-xl shadow-neo-sm dark:shadow-neo-dark-sm p-3 mb-2 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
                   <span className="text-gray-800 dark:text-gray-100">{invite.householdName}</span>
                   <div className="flex gap-2">
                     <button
                       onClick={() => acceptInvite(invite.householdId)}
-                      className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                      className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm btn-neo"
                     >
                       Annehmen
                     </button>
                     <button
                       onClick={() => declineInvite(invite.householdId)}
-                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                      className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm btn-neo"
                     >
                       Ablehnen
                     </button>
@@ -2073,7 +2065,9 @@ export default function HouseholdPlanner() {
       </div>
 
       <div className="max-w-6xl mx-auto p-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-6">
+        {/* Filter Panel - only shown on tasks/archive views */}
+        {activeTab !== 'settings' && activeTab !== 'statistics' && (
+        <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-5 mb-6 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Kategorien</h2>
           </div>
@@ -2081,10 +2075,10 @@ export default function HouseholdPlanner() {
           <div className="flex flex-wrap gap-2 mb-4">
             <button
               onClick={() => setSelectedCategory('all')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-4 py-2 rounded-xl transition-all btn-neo ${
                 selectedCategory === 'all'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                  ? 'bg-indigo-600 text-white shadow-neo-sm dark:shadow-neo-dark-sm'
+                  : 'shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 bg-[#e0e0e0] dark:bg-[#1e1e2e]'
               }`}
             >
               Alle ({tasks.length})
@@ -2093,16 +2087,19 @@ export default function HouseholdPlanner() {
               <button
                 key={cat._id}
                 onClick={() => setSelectedCategory(cat._id)}
-                className={`px-4 py-2 rounded-lg transition-colors ${
+                className={`px-4 py-2 rounded-xl transition-all btn-neo ${
                   selectedCategory === cat._id
-                    ? 'text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:opacity-80'
+                    ? 'text-white shadow-neo-sm dark:shadow-neo-dark-sm'
+                    : 'shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 hover:opacity-80'
                 }`}
                 style={{
-                  backgroundColor: selectedCategory === cat._id ? cat.color : `${cat.color}40`
+                  backgroundColor: selectedCategory === cat._id ? cat.color : undefined
                 }}
               >
-                {cat.name} ({tasks.filter(t => t.category === cat._id).length})
+                <span className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: cat.color }}></span>
+                  {cat.name} ({tasks.filter(t => t.category === cat._id).length})
+                </span>
               </button>
             ))}
           </div>
@@ -2113,20 +2110,20 @@ export default function HouseholdPlanner() {
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setAssignmentFilter('all')}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
+                  className={`px-4 py-2 rounded-xl transition-all btn-neo ${
                     assignmentFilter === 'all'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                      ? 'bg-indigo-600 text-white shadow-neo-sm dark:shadow-neo-dark-sm'
+                      : 'shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 bg-[#e0e0e0] dark:bg-[#1e1e2e]'
                   }`}
                 >
                   Alle
                 </button>
                 <button
                   onClick={() => setAssignmentFilter('mine')}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
+                  className={`px-4 py-2 rounded-xl transition-all btn-neo ${
                     assignmentFilter === 'mine'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                      ? 'bg-indigo-600 text-white shadow-neo-sm dark:shadow-neo-dark-sm'
+                      : 'shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 bg-[#e0e0e0] dark:bg-[#1e1e2e]'
                   }`}
                 >
                   Meine Aufgaben
@@ -2135,10 +2132,10 @@ export default function HouseholdPlanner() {
                   <button
                     key={member._id}
                     onClick={() => setAssignmentFilter(`member:${member._id}`)}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
+                    className={`px-4 py-2 rounded-xl transition-all btn-neo ${
                       assignmentFilter === `member:${member._id}`
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                        ? 'bg-indigo-600 text-white shadow-neo-sm dark:shadow-neo-dark-sm'
+                        : 'shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 bg-[#e0e0e0] dark:bg-[#1e1e2e]'
                     }`}
                   >
                     {member.name}
@@ -2146,10 +2143,10 @@ export default function HouseholdPlanner() {
                 ))}
                 <button
                   onClick={() => setAssignmentFilter('unassigned')}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
+                  className={`px-4 py-2 rounded-xl transition-all btn-neo ${
                     assignmentFilter === 'unassigned'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                      ? 'bg-indigo-600 text-white shadow-neo-sm dark:shadow-neo-dark-sm'
+                      : 'shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 bg-[#e0e0e0] dark:bg-[#1e1e2e]'
                   }`}
                 >
                   Nicht zugewiesen
@@ -2158,402 +2155,390 @@ export default function HouseholdPlanner() {
             </div>
           )}
 
-          {viewMode === 'tasks' && (
+          {/* Tasks / Archiv Toggle */}
+          <div className="flex gap-2">
             <button
-              onClick={() => setShowAddTask(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              onClick={() => { setViewMode('tasks'); setActiveTab('tasks'); }}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl transition-all btn-neo ${
+                viewMode === 'tasks'
+                  ? 'bg-indigo-600 text-white shadow-neo-sm dark:shadow-neo-dark-sm'
+                  : 'shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 bg-[#e0e0e0] dark:bg-[#1e1e2e]'
+              }`}
             >
-              <Plus className="w-5 h-5" />
-              Neue Aufgabe hinzufügen
+              <CheckSquare className="w-4 h-4" />
+              Aufgaben
             </button>
-          )}
-          <button
-            onClick={() => setShowCalendar(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors mt-3"
-          >
-            <Calendar className="w-5 h-5" />
-            Kalenderansicht
-          </button>
-
-          {/* Ansicht-Umschalter */}
-          <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Ansicht</p>
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={() => setViewMode('tasks')}
-                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                  viewMode === 'tasks'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
-                }`}
-              >
-                <CheckSquare className="w-4 h-4" />
-                Aufgaben
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode('archive');
-                  loadArchivedTasks();
-                }}
-                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                  viewMode === 'archive'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
-                }`}
-              >
-                <Archive className="w-4 h-4" />
-                Archiv
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode('statistics');
-                  loadStatistics();
-                }}
-                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                  viewMode === 'statistics'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
-                }`}
-              >
-                <BarChart className="w-4 h-4" />
-                Statistiken
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                setViewMode('archive');
+                setActiveTab('tasks');
+                loadArchivedTasks();
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl transition-all btn-neo ${
+                viewMode === 'archive'
+                  ? 'bg-indigo-600 text-white shadow-neo-sm dark:shadow-neo-dark-sm'
+                  : 'shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 bg-[#e0e0e0] dark:bg-[#1e1e2e]'
+              }`}
+            >
+              <Archive className="w-4 h-4" />
+              Archiv
+            </button>
           </div>
         </div>
+        )}
 
-        {/* Einstellungen Modal */}
-        {showSettings && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-8">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-2xl my-4 sm:my-8 max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Einstellungen</h3>
+        {/* Settings Page (inline, not modal) */}
+        {activeTab === 'settings' && (
+          <div className="view-transition space-y-6">
+            <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Einstellungen</h3>
+
+            {/* Quick Actions */}
+            <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-5 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+              <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Aktionen</h4>
+              <div className="flex flex-wrap gap-3">
                 <button
-                  onClick={() => setShowSettings(false)}
-                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                  onClick={createSharedHousehold}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors btn-neo"
                 >
-                  <X className="w-6 h-6" />
+                  <FolderPlus className="w-5 h-5" />
+                  Gemeinsamen Haushalt erstellen
+                </button>
+                {Capacitor.isNativePlatform() && (
+                  <button
+                    onClick={scanQRCode}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 bg-[#e0e0e0] dark:bg-[#1e1e2e] btn-neo"
+                  >
+                    <CheckSquare className="w-5 h-5" />
+                    QR-Code scannen
+                  </button>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors btn-neo"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Abmelden
                 </button>
               </div>
+            </div>
 
-              {/* Haushaltsmitglieder */}
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                    <Users className="w-5 h-5" />
-                    {selectedHousehold.isPrivate ? 'Privater Haushalt 🔒' : `Mitglieder (${selectedHousehold.members.length})`}
-                  </h4>
-                  {!selectedHousehold.isPrivate && (
-                    <button
-                      onClick={() => setShowInviteModal(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                      <Mail className="w-4 h-4" />
-                      Einladen
-                    </button>
-                  )}
-                </div>
-
-                {selectedHousehold.isPrivate && (
-                  <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-sm text-yellow-800">
-                      <strong>Privater Haushalt:</strong> Dieser Haushalt ist nur für dich. Um Aufgaben mit anderen zu teilen, erstelle einen gemeinsamen Haushalt über den grünen "Gemeinsam"-Button oben.
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  {selectedHousehold.memberDetails?.map(member => (
-                    <div
-                      key={member._id}
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-800 dark:text-gray-100">{member.name}</p>
-                        <p className="text-sm text-gray-500">{member.email}</p>
-                        {member._id === selectedHousehold.createdBy && (
-                          <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded mt-1 inline-block">
-                            Ersteller
-                          </span>
-                        )}
-                      </div>
-                      {member._id !== selectedHousehold.createdBy && (
-                        <button
-                          onClick={() => removeMember(member._id)}
-                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Ausstehende Einladungen */}
-                {selectedHousehold.invites?.filter(inv => inv.status === 'pending').length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium text-gray-600 mb-2">Ausstehende Einladungen:</p>
-                    {selectedHousehold.invites
-                      .filter(inv => inv.status === 'pending')
-                      .map((inv, idx) => (
-                        <div key={idx} className="text-sm text-gray-500 dark:text-gray-400 bg-yellow-50 p-2 rounded mb-1">
-                          📧 {inv.email} - Eingeladen am {new Date(inv.invitedAt).toLocaleDateString('de-DE')}
-                        </div>
-                      ))}
-                  </div>
-                )}
-
-                {/* Haushalt löschen - nur für gemeinsame Haushalte */}
-                {!selectedHousehold.isPrivate && selectedHousehold.members.length === 1 && (
-                  <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="text-sm text-red-800 mb-3">
-                      <strong>Achtung:</strong> Du bist das einzige Mitglied in diesem Haushalt. Du kannst ihn jetzt löschen.
-                    </p>
-                    <button
-                      onClick={deleteHousehold}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Haushalt dauerhaft löschen
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t pt-6 mb-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Kategorien verwalten</h4>
-                  <button
-                    onClick={() => setShowAddCategory(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                  >
-                    <FolderPlus className="w-4 h-4" />
-                    Neue Kategorie
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  {categories.length === 0 ? (
-                    <p className="text-gray-500 dark:text-gray-400 text-center py-8">Keine Kategorien vorhanden</p>
-                  ) : (
-                    categories.map(cat => (
-                      <div
-                        key={cat._id}
-                        className="flex flex-wrap items-center gap-3 p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-[200px]">
-                          <div
-                            className="w-6 h-6 rounded flex-shrink-0"
-                            style={{ backgroundColor: cat.color }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-gray-800 dark:text-gray-100 break-words">{cat.name}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                              {tasks.filter(t => t.category === cat._id).length} Aufgaben
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-                          <button
-                            onClick={() => {
-                              setEditingCategory(cat);
-                              setShowEditCategory(true);
-                            }}
-                            className="p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
-                          >
-                            <Edit2 className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => deleteCategory(cat._id)}
-                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="border-t pt-6 mb-6">
-                <h4 className="text-lg font-semibold text-gray-800 mb-4">Darstellung</h4>
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-800 dark:text-gray-100">Dark Mode</p>
-                    <p className="text-sm text-gray-500">Dunkles Farbschema aktivieren</p>
-                  </div>
-                  <button
-                    onClick={() => setDarkMode(!darkMode)}
-                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                      darkMode ? 'bg-indigo-600' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                        darkMode ? 'translate-x-7' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              <div className="border-t pt-6 mb-6">
-                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
-                  <Bell className="w-5 h-5" />
-                  Benachrichtigungen
+            {/* Haushaltsmitglieder */}
+            <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-5 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  {selectedHousehold.isPrivate ? 'Privater Haushalt 🔒' : `Mitglieder (${selectedHousehold.members.length})`}
                 </h4>
-                <div className="space-y-4">
-                  {/* Tägliche Aufgaben-Erinnerung */}
-                  <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <p className="font-medium text-gray-800 dark:text-gray-100">Tägliche Erinnerung</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Erhalte eine tägliche Übersicht deiner heutigen Aufgaben</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const newPrefs = { ...notificationPreferences, dailyTaskReminder: !notificationPreferences.dailyTaskReminder };
-                          saveNotificationPreferences(newPrefs);
-                        }}
-                        className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                          notificationPreferences.dailyTaskReminder ? 'bg-indigo-600' : 'bg-gray-300'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                            notificationPreferences.dailyTaskReminder ? 'translate-x-7' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                    {notificationPreferences.dailyTaskReminder && (
-                      <div className="mt-3">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Uhrzeit
-                        </label>
-                        <input
-                          type="time"
-                          value={notificationPreferences.reminderTime}
-                          onChange={(e) => {
-                            const newPrefs = { ...notificationPreferences, reminderTime: e.target.value };
-                            saveNotificationPreferences(newPrefs);
-                          }}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Deadline-Benachrichtigungen */}
-                  <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-800 dark:text-gray-100">Deadline-Erinnerungen</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Benachrichtigungen für anstehende und überfällige Aufgaben</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const newPrefs = { ...notificationPreferences, deadlineNotifications: !notificationPreferences.deadlineNotifications };
-                          saveNotificationPreferences(newPrefs);
-                        }}
-                        className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                          notificationPreferences.deadlineNotifications ? 'bg-indigo-600' : 'bg-gray-300'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                            notificationPreferences.deadlineNotifications ? 'translate-x-7' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Aufgaben-Zuweisungen */}
-                  <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-800 dark:text-gray-100">Aufgaben-Zuweisungen</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Benachrichtigungen wenn dir eine Aufgabe zugewiesen wird</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const newPrefs = { ...notificationPreferences, taskAssignments: !notificationPreferences.taskAssignments };
-                          saveNotificationPreferences(newPrefs);
-                        }}
-                        className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                          notificationPreferences.taskAssignments ? 'bg-indigo-600' : 'bg-gray-300'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                            notificationPreferences.taskAssignments ? 'translate-x-7' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                {!selectedHousehold.isPrivate && (
+                  <button
+                    onClick={() => setShowInviteModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors btn-neo"
+                  >
+                    <Mail className="w-4 h-4" />
+                    Einladen
+                  </button>
+                )}
               </div>
 
-              {!selectedHousehold.isPrivate && (
-                <div className="border-t pt-6 mb-6">
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
-                    Terminal-Modus
-                  </h4>
-                  {!selectedHousehold.terminalToken ? (
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        Erstelle einen Terminal-Token, um diesen Haushalt auf einem Tablet als dauerhaftes Dashboard zu verwenden. Kein Login erforderlich.
-                      </p>
-                      <button
-                        onClick={generateTerminalToken}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        Terminal-Token erstellen
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        QR-Code scannen oder Link kopieren, um das Terminal zu öffnen. Der Link funktioniert ohne Login.
-                      </p>
-                      <div className="flex flex-col items-center gap-4 mb-4">
-                        <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${FRONTEND_URL}?terminal=${selectedHousehold.terminalToken}`)}`}
-                          alt="Terminal QR-Code"
-                          className="w-48 h-48 rounded-lg border border-gray-200 dark:border-gray-600"
-                        />
-                        <div className="w-full flex gap-2">
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${FRONTEND_URL}?terminal=${selectedHousehold.terminalToken}`);
-                              alert('Link kopiert!');
-                            }}
-                            className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
-                          >
-                            Link kopieren
-                          </button>
-                          <button
-                            onClick={revokeTerminalToken}
-                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-                          >
-                            Token widerrufen
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+              {selectedHousehold.isPrivate && (
+                <div className="mb-4 rounded-xl shadow-neo-inset dark:shadow-neo-dark-inset p-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <strong>Privater Haushalt:</strong> Dieser Haushalt ist nur für dich. Um Aufgaben mit anderen zu teilen, erstelle einen gemeinsamen Haushalt.
+                  </p>
                 </div>
               )}
 
-              <div className="border-t pt-6">
-                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Konto</h4>
-                <div className="space-y-2">
-                  <p className="text-gray-600 dark:text-gray-400"><strong>Name:</strong> {currentUser?.name}</p>
-                  <p className="text-gray-600 dark:text-gray-400"><strong>E-Mail:</strong> {currentUser?.email}</p>
+              <div className="space-y-2">
+                {selectedHousehold.memberDetails?.map(member => (
+                  <div
+                    key={member._id}
+                    className="flex items-center justify-between p-4 rounded-xl shadow-neo-sm dark:shadow-neo-dark-sm bg-[#e0e0e0] dark:bg-[#1e1e2e]"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-800 dark:text-gray-100">{member.name}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{member.email}</p>
+                      {member._id === selectedHousehold.createdBy && (
+                        <span className="text-xs bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded mt-1 inline-block">
+                          Ersteller
+                        </span>
+                      )}
+                    </div>
+                    {member._id !== selectedHousehold.createdBy && (
+                      <button
+                        onClick={() => removeMember(member._id)}
+                        className="p-2 text-red-500 hover:text-red-700 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {selectedHousehold.invites?.filter(inv => inv.status === 'pending').length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Ausstehende Einladungen:</p>
+                  {selectedHousehold.invites
+                    .filter(inv => inv.status === 'pending')
+                    .map((inv, idx) => (
+                      <div key={idx} className="text-sm text-gray-500 dark:text-gray-400 rounded-lg shadow-neo-inset dark:shadow-neo-dark-inset p-2 mb-1">
+                        {inv.email} - Eingeladen am {new Date(inv.invitedAt).toLocaleDateString('de-DE')}
+                      </div>
+                    ))}
                 </div>
+              )}
+
+              {!selectedHousehold.isPrivate && selectedHousehold.members.length === 1 && (
+                <div className="mt-4 rounded-xl shadow-neo-inset dark:shadow-neo-dark-inset p-4">
+                  <p className="text-sm text-red-600 dark:text-red-400 mb-3">
+                    <strong>Achtung:</strong> Du bist das einzige Mitglied in diesem Haushalt. Du kannst ihn jetzt löschen.
+                  </p>
+                  <button
+                    onClick={deleteHousehold}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors btn-neo"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Haushalt dauerhaft löschen
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Kategorien verwalten */}
+            <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-5 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Kategorien verwalten</h4>
+                <button
+                  onClick={() => setShowAddCategory(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors btn-neo"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  Neue Kategorie
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {categories.length === 0 ? (
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-8">Keine Kategorien vorhanden</p>
+                ) : (
+                  categories.map(cat => (
+                    <div
+                      key={cat._id}
+                      className="flex flex-wrap items-center gap-3 p-4 rounded-xl shadow-neo-sm dark:shadow-neo-dark-sm bg-[#e0e0e0] dark:bg-[#1e1e2e]"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+                        <div
+                          className="w-6 h-6 rounded-lg flex-shrink-0"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-800 dark:text-gray-100 break-words">{cat.name}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                            {tasks.filter(t => t.category === cat._id).length} Aufgaben
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                        <button
+                          onClick={() => {
+                            setEditingCategory(cat);
+                            setShowEditCategory(true);
+                          }}
+                          className="p-2 text-indigo-500 hover:text-indigo-700 rounded-lg transition-colors"
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => deleteCategory(cat._id)}
+                          className="p-2 text-red-500 hover:text-red-700 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Darstellung */}
+            <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-5 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+              <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Darstellung</h4>
+              <div className="flex items-center justify-between p-4 rounded-xl shadow-neo-sm dark:shadow-neo-dark-sm bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+                <div>
+                  <p className="font-medium text-gray-800 dark:text-gray-100">Dark Mode</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Dunkles Farbschema aktivieren</p>
+                </div>
+                <button
+                  onClick={() => setDarkMode(!darkMode)}
+                  className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                    darkMode ? 'bg-indigo-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                      darkMode ? 'translate-x-7' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Benachrichtigungen */}
+            <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-5 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+              <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                <Bell className="w-5 h-5" />
+                Benachrichtigungen
+              </h4>
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl shadow-neo-sm dark:shadow-neo-dark-sm bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="font-medium text-gray-800 dark:text-gray-100">Tägliche Erinnerung</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Erhalte eine tägliche Übersicht deiner heutigen Aufgaben</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newPrefs = { ...notificationPreferences, dailyTaskReminder: !notificationPreferences.dailyTaskReminder };
+                        saveNotificationPreferences(newPrefs);
+                      }}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                        notificationPreferences.dailyTaskReminder ? 'bg-indigo-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                          notificationPreferences.dailyTaskReminder ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {notificationPreferences.dailyTaskReminder && (
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Uhrzeit
+                      </label>
+                      <input
+                        type="time"
+                        value={notificationPreferences.reminderTime}
+                        onChange={(e) => {
+                          const newPrefs = { ...notificationPreferences, reminderTime: e.target.value };
+                          saveNotificationPreferences(newPrefs);
+                        }}
+                        className="px-4 py-2 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 rounded-xl shadow-neo-sm dark:shadow-neo-dark-sm bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-800 dark:text-gray-100">Deadline-Erinnerungen</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Benachrichtigungen für anstehende und überfällige Aufgaben</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newPrefs = { ...notificationPreferences, deadlineNotifications: !notificationPreferences.deadlineNotifications };
+                        saveNotificationPreferences(newPrefs);
+                      }}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                        notificationPreferences.deadlineNotifications ? 'bg-indigo-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                          notificationPreferences.deadlineNotifications ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl shadow-neo-sm dark:shadow-neo-dark-sm bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-800 dark:text-gray-100">Aufgaben-Zuweisungen</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Benachrichtigungen wenn dir eine Aufgabe zugewiesen wird</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newPrefs = { ...notificationPreferences, taskAssignments: !notificationPreferences.taskAssignments };
+                        saveNotificationPreferences(newPrefs);
+                      }}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                        notificationPreferences.taskAssignments ? 'bg-indigo-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                          notificationPreferences.taskAssignments ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Terminal-Modus */}
+            {!selectedHousehold.isPrivate && (
+              <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-5 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                  Terminal-Modus
+                </h4>
+                {!selectedHousehold.terminalToken ? (
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      Erstelle einen Terminal-Token, um diesen Haushalt auf einem Tablet als dauerhaftes Dashboard zu verwenden.
+                    </p>
+                    <button
+                      onClick={generateTerminalToken}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors btn-neo"
+                    >
+                      Terminal-Token erstellen
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      QR-Code scannen oder Link kopieren, um das Terminal zu öffnen.
+                    </p>
+                    <div className="flex flex-col items-center gap-4 mb-4">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${FRONTEND_URL}?terminal=${selectedHousehold.terminalToken}`)}`}
+                        alt="Terminal QR-Code"
+                        className="w-48 h-48 rounded-xl shadow-neo-inset dark:shadow-neo-dark-inset"
+                      />
+                      <div className="w-full flex gap-2">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${FRONTEND_URL}?terminal=${selectedHousehold.terminalToken}`);
+                            alert('Link kopiert!');
+                          }}
+                          className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm btn-neo"
+                        >
+                          Link kopieren
+                        </button>
+                        <button
+                          onClick={revokeTerminalToken}
+                          className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors text-sm btn-neo"
+                        >
+                          Token widerrufen
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Konto */}
+            <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-5 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+              <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Konto</h4>
+              <div className="space-y-2">
+                <p className="text-gray-600 dark:text-gray-400"><strong>Name:</strong> {currentUser?.name}</p>
+                <p className="text-gray-600 dark:text-gray-400"><strong>E-Mail:</strong> {currentUser?.email}</p>
               </div>
             </div>
           </div>
@@ -2561,10 +2546,10 @@ export default function HouseholdPlanner() {
 
         {/* Einladungs-Modal */}
         {showInviteModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Benutzer einladen</h3>
-              <p className="text-gray-600 text-sm mb-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20 modal-backdrop">
+            <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-6 w-full max-w-md my-4 bg-[#e0e0e0] dark:bg-[#1e1e2e] modal-content">
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Benutzer einladen</h3>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
                 Gib die E-Mail-Adresse des Benutzers ein, den du zu "{selectedHousehold.name}" einladen möchtest.
               </p>
               <input
@@ -2572,12 +2557,12 @@ export default function HouseholdPlanner() {
                 placeholder="E-Mail-Adresse"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 mb-4"
               />
               <div className="flex gap-2">
                 <button
                   onClick={handleInvite}
-                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
+                  className="flex-1 bg-indigo-600 text-white py-2 rounded-xl hover:bg-indigo-700 btn-neo"
                 >
                   Einladen
                 </button>
@@ -2586,7 +2571,7 @@ export default function HouseholdPlanner() {
                     setShowInviteModal(false);
                     setInviteEmail('');
                   }}
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 py-2 rounded-xl bg-[#e0e0e0] dark:bg-[#1e1e2e] btn-neo"
                 >
                   Abbrechen
                 </button>
@@ -2597,15 +2582,15 @@ export default function HouseholdPlanner() {
 
         {/* Kategorie bearbeiten Modal */}
         {showEditCategory && editingCategory && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Kategorie bearbeiten</h3>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20 modal-backdrop">
+            <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-6 w-full max-w-md my-4 bg-[#e0e0e0] dark:bg-[#1e1e2e] modal-content">
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Kategorie bearbeiten</h3>
               <input
                 type="text"
                 placeholder="Kategoriename"
                 value={editingCategory.name}
                 onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 mb-4"
               />
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Farbe</label>
@@ -2613,13 +2598,13 @@ export default function HouseholdPlanner() {
                   type="color"
                   value={editingCategory.color}
                   onChange={(e) => setEditingCategory({ ...editingCategory, color: e.target.value })}
-                  className="w-full h-12 rounded-lg cursor-pointer"
+                  className="w-full h-12 rounded-xl cursor-pointer"
                 />
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={handleEditCategory}
-                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
+                  className="flex-1 bg-indigo-600 text-white py-2 rounded-xl hover:bg-indigo-700 btn-neo"
                 >
                   Speichern
                 </button>
@@ -2628,7 +2613,7 @@ export default function HouseholdPlanner() {
                     setShowEditCategory(false);
                     setEditingCategory(null);
                   }}
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 py-2 rounded-xl bg-[#e0e0e0] dark:bg-[#1e1e2e] btn-neo"
                 >
                   Abbrechen
                 </button>
@@ -2639,15 +2624,15 @@ export default function HouseholdPlanner() {
 
         {/* Neue Kategorie Modal */}
         {showAddCategory && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Neue Kategorie</h3>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20 modal-backdrop">
+            <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-6 w-full max-w-md my-4 bg-[#e0e0e0] dark:bg-[#1e1e2e] modal-content">
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Neue Kategorie</h3>
               <input
                 type="text"
                 placeholder="Kategoriename"
                 value={newCategory.name}
                 onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 mb-4"
               />
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Farbe</label>
@@ -2655,13 +2640,13 @@ export default function HouseholdPlanner() {
                   type="color"
                   value={newCategory.color}
                   onChange={(e) => setNewCategory({ ...newCategory, color: e.target.value })}
-                  className="w-full h-12 rounded-lg cursor-pointer"
+                  className="w-full h-12 rounded-xl cursor-pointer"
                 />
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={handleAddCategory}
-                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
+                  className="flex-1 bg-indigo-600 text-white py-2 rounded-xl hover:bg-indigo-700 btn-neo"
                 >
                   Erstellen
                 </button>
@@ -2670,7 +2655,7 @@ export default function HouseholdPlanner() {
                     setShowAddCategory(false);
                     setNewCategory({ name: '', color: '#3b82f6' });
                   }}
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 py-2 rounded-xl bg-[#e0e0e0] dark:bg-[#1e1e2e] btn-neo"
                 >
                   Abbrechen
                 </button>
@@ -2681,20 +2666,20 @@ export default function HouseholdPlanner() {
 
         {/* Neue Aufgabe Modal */}
         {showAddTask && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Neue Aufgabe</h3>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20 modal-backdrop">
+            <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-6 w-full max-w-md my-4 bg-[#e0e0e0] dark:bg-[#1e1e2e] modal-content">
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Neue Aufgabe</h3>
               <input
                 type="text"
                 placeholder="Aufgabentitel"
                 value={newTask.title}
                 onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 mb-4"
               />
               <select
                 value={newTask.category}
                 onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 mb-4"
               >
                 <option value="">Kategorie wählen</option>
                 {categories.map(cat => (
@@ -2705,16 +2690,15 @@ export default function HouseholdPlanner() {
                 type="datetime-local"
                 value={newTask.deadline}
                 onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 mb-4"
               />
 
-              {/* Dringlichkeitsstufe */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dringlichkeit</label>
                 <select
                   value={newTask.priority}
                   onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                  className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100"
                 >
                   <option value="low">Niedrig</option>
                   <option value="medium">Mittel</option>
@@ -2722,20 +2706,19 @@ export default function HouseholdPlanner() {
                 </select>
               </div>
 
-              {/* Beschreibung */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Beschreibung (optional)</label>
                 <textarea
                   value={newTask.description}
                   onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
                   placeholder="Weitere Details zur Aufgabe..."
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg resize-none"
+                  className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 resize-none"
                   rows="3"
                 />
               </div>
 
               {selectedHousehold && !selectedHousehold.isPrivate && (
-                <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
+                <div className="mb-4 p-3 rounded-xl shadow-neo-inset dark:shadow-neo-dark-inset">
                   <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Zugewiesen an:</p>
                   {selectedHousehold.memberDetails?.map(member => (
                     <label key={member._id} className="flex items-center gap-2 mb-2 cursor-pointer">
@@ -2751,7 +2734,7 @@ export default function HouseholdPlanner() {
                         }}
                         className="w-4 h-4"
                       />
-                      <span className="text-gray-700">{member.name} ({member.email})</span>
+                      <span className="text-gray-700 dark:text-gray-300">{member.name} ({member.email})</span>
                     </label>
                   ))}
                   {newTask.assignedTo.length === 0 && (
@@ -2760,8 +2743,7 @@ export default function HouseholdPlanner() {
                 </div>
               )}
 
-              {/* Wiederkehrende Aufgabe */}
-              <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
+              <div className="mb-4 p-3 rounded-xl shadow-neo-inset dark:shadow-neo-dark-inset">
                 <label className="flex items-center gap-2 mb-2">
                   <input
                     type="checkbox"
@@ -2772,7 +2754,7 @@ export default function HouseholdPlanner() {
                     })}
                     className="w-4 h-4"
                   />
-                  <span className="font-medium text-gray-700">Wiederkehrende Aufgabe</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">Wiederkehrende Aufgabe</span>
                 </label>
                 {newTask.recurrence.enabled && (
                   <div className="mt-2 space-y-2">
@@ -2782,7 +2764,7 @@ export default function HouseholdPlanner() {
                         ...newTask,
                         recurrence: { ...newTask.recurrence, frequency: e.target.value }
                       })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                      className="w-full px-3 py-2 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 text-sm"
                     >
                       <option value="daily">Täglich</option>
                       <option value="weekly">Wöchentlich</option>
@@ -2798,7 +2780,7 @@ export default function HouseholdPlanner() {
                           ...newTask,
                           recurrence: { ...newTask.recurrence, interval: parseInt(e.target.value) || 1 }
                         })}
-                        className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                        className="w-20 px-3 py-2 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 text-sm"
                       />
                       <span className="text-sm text-gray-600 dark:text-gray-400">
                         {newTask.recurrence.frequency === 'daily' ? 'Tag(e)' :
@@ -2812,7 +2794,7 @@ export default function HouseholdPlanner() {
               <div className="flex gap-2">
                 <button
                   onClick={handleAddTask}
-                  className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
+                  className="flex-1 bg-green-600 text-white py-2 rounded-xl hover:bg-green-700 btn-neo"
                 >
                   Hinzufügen
                 </button>
@@ -2829,7 +2811,7 @@ export default function HouseholdPlanner() {
                       recurrence: { enabled: false, frequency: 'weekly', interval: 1 }
                     });
                   }}
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 py-2 rounded-xl bg-[#e0e0e0] dark:bg-[#1e1e2e] btn-neo"
                 >
                   Abbrechen
                 </button>
@@ -2840,20 +2822,20 @@ export default function HouseholdPlanner() {
 
         {/* Aufgabe bearbeiten Modal */}
         {showEditTask && editingTask && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md my-4">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Aufgabe bearbeiten</h3>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-20 modal-backdrop">
+            <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-6 w-full max-w-md my-4 bg-[#e0e0e0] dark:bg-[#1e1e2e] modal-content">
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Aufgabe bearbeiten</h3>
               <input
                 type="text"
                 placeholder="Aufgabentitel"
                 value={editingTask.title}
                 onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 mb-4"
               />
               <select
                 value={editingTask.category}
                 onChange={(e) => setEditingTask({ ...editingTask, category: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 mb-4"
               >
                 <option value="">Kategorie wählen</option>
                 {categories.map(cat => (
@@ -2864,16 +2846,15 @@ export default function HouseholdPlanner() {
                 type="datetime-local"
                 value={editingTask.deadline}
                 onChange={(e) => setEditingTask({ ...editingTask, deadline: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
+                className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 mb-4"
               />
 
-              {/* Dringlichkeitsstufe */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dringlichkeit</label>
                 <select
                   value={editingTask.priority || 'medium'}
                   onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                  className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100"
                 >
                   <option value="low">Niedrig</option>
                   <option value="medium">Mittel</option>
@@ -2881,20 +2862,19 @@ export default function HouseholdPlanner() {
                 </select>
               </div>
 
-              {/* Beschreibung */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Beschreibung (optional)</label>
                 <textarea
                   value={editingTask.description || ''}
                   onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
                   placeholder="Weitere Details zur Aufgabe..."
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg resize-none"
+                  className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 resize-none"
                   rows="3"
                 />
               </div>
 
               {selectedHousehold && !selectedHousehold.isPrivate && (
-                <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
+                <div className="mb-4 p-3 rounded-xl shadow-neo-inset dark:shadow-neo-dark-inset">
                   <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Zugewiesen an:</p>
                   {selectedHousehold.memberDetails?.map(member => (
                     <label key={member._id} className="flex items-center gap-2 mb-2 cursor-pointer">
@@ -2911,7 +2891,7 @@ export default function HouseholdPlanner() {
                         }}
                         className="w-4 h-4"
                       />
-                      <span className="text-gray-700">{member.name} ({member.email})</span>
+                      <span className="text-gray-700 dark:text-gray-300">{member.name} ({member.email})</span>
                     </label>
                   ))}
                   {(!editingTask.assignedTo || editingTask.assignedTo.length === 0) && (
@@ -2920,8 +2900,7 @@ export default function HouseholdPlanner() {
                 </div>
               )}
 
-              {/* Wiederkehrende Aufgabe */}
-              <div className="mb-4 p-3 border border-gray-300 dark:border-gray-600 rounded-lg">
+              <div className="mb-4 p-3 rounded-xl shadow-neo-inset dark:shadow-neo-dark-inset">
                 <label className="flex items-center gap-2 mb-2">
                   <input
                     type="checkbox"
@@ -2937,7 +2916,7 @@ export default function HouseholdPlanner() {
                     })}
                     className="w-4 h-4"
                   />
-                  <span className="font-medium text-gray-700">Wiederkehrende Aufgabe</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">Wiederkehrende Aufgabe</span>
                 </label>
                 {editingTask.recurrence?.enabled && (
                   <div className="mt-2 space-y-2">
@@ -2947,7 +2926,7 @@ export default function HouseholdPlanner() {
                         ...editingTask,
                         recurrence: { ...editingTask.recurrence, frequency: e.target.value }
                       })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                      className="w-full px-3 py-2 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 text-sm"
                     >
                       <option value="daily">Täglich</option>
                       <option value="weekly">Wöchentlich</option>
@@ -2963,7 +2942,7 @@ export default function HouseholdPlanner() {
                           ...editingTask,
                           recurrence: { ...editingTask.recurrence, interval: parseInt(e.target.value) || 1 }
                         })}
-                        className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                        className="w-20 px-3 py-2 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100 text-sm"
                       />
                       <span className="text-sm text-gray-600 dark:text-gray-400">
                         {editingTask.recurrence.frequency === 'daily' ? 'Tag(e)' :
@@ -2977,7 +2956,7 @@ export default function HouseholdPlanner() {
               <div className="flex gap-2">
                 <button
                   onClick={handleEditTask}
-                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
+                  className="flex-1 bg-indigo-600 text-white py-2 rounded-xl hover:bg-indigo-700 btn-neo"
                 >
                   Speichern
                 </button>
@@ -2986,7 +2965,7 @@ export default function HouseholdPlanner() {
                     setShowEditTask(false);
                     setEditingTask(null);
                   }}
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-300"
+                  className="flex-1 shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 py-2 rounded-xl bg-[#e0e0e0] dark:bg-[#1e1e2e] btn-neo"
                 >
                   Abbrechen
                 </button>
@@ -2997,13 +2976,13 @@ export default function HouseholdPlanner() {
 
         {/* Kalenderansicht Modal */}
         {showCalendar && selectedHousehold && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-8">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-4xl my-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto pt-4 sm:pt-8 modal-backdrop">
+            <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-6 w-full max-w-4xl my-4 bg-[#e0e0e0] dark:bg-[#1e1e2e] modal-content">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Kalenderansicht</h3>
                 <button
                   onClick={() => setShowCalendar(false)}
-                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                  className="p-2 rounded-xl shadow-neo-sm dark:shadow-neo-dark-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 btn-neo"
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -3039,9 +3018,9 @@ export default function HouseholdPlanner() {
                     const dateStr = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
                     return (
-                      <div key={dateKey} className="border border-gray-200 rounded-lg p-4">
+                      <div key={dateKey} className="rounded-2xl shadow-neo-sm dark:shadow-neo-dark-sm p-4 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
                         <div className="flex items-center gap-3 mb-3">
-                          <div className={`px-3 py-1 rounded-lg ${isToday ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'}`}>
+                          <div className={`px-3 py-1 rounded-xl ${isToday ? 'bg-indigo-600 text-white' : 'shadow-neo-flat dark:shadow-neo-dark-flat text-gray-700 dark:text-gray-300'}`}>
                             <span className="font-bold">{dayName}</span>
                             <span className="ml-2 text-sm">{dateStr}</span>
                           </div>
@@ -3069,9 +3048,8 @@ export default function HouseholdPlanner() {
                               return (
                                 <div
                                   key={task._id}
-                                  className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                                  className="flex items-start gap-3 p-3 rounded-xl shadow-neo-flat dark:shadow-neo-dark-flat bg-[#e0e0e0] dark:bg-[#1e1e2e] card-neo cursor-pointer"
                                   onClick={() => openEditTask(task)}
-                                  style={{ cursor: 'pointer' }}
                                 >
                                   <div
                                     className="w-3 h-3 rounded-full flex-shrink-0 mt-1.5"
@@ -3117,11 +3095,11 @@ export default function HouseholdPlanner() {
         )}
 
         {/* Aufgabenliste */}
-        {viewMode === 'tasks' && (
-          <div className="space-y-6">
+        {viewMode === 'tasks' && activeTab === 'tasks' && (
+          <div className="space-y-6 view-transition">
             {/* Anstehende Aufgaben-Übersicht */}
             {(overdueTasks.length > 0 || upcomingTasks.length > 0) && (
-              <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-gray-800 dark:to-gray-800 rounded-xl shadow-md p-5 border border-orange-200 dark:border-gray-700">
+              <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-5 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
                 <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
                   <AlertCircle className="w-5 h-5 text-orange-500" />
                   Anstehende Aufgaben
@@ -3133,7 +3111,7 @@ export default function HouseholdPlanner() {
                       {overdueTasks.map(task => {
                         const cat = categories.find(c => c._id === task.category);
                         return (
-                          <div key={task._id} className="flex items-center gap-3 bg-red-100 dark:bg-red-900/30 rounded-lg px-3 py-2">
+                          <div key={task._id} className="flex items-center gap-3 bg-red-100 dark:bg-red-900/30 rounded-xl px-3 py-2">
                             {cat && <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />}
                             <span className="font-medium text-red-800 dark:text-red-300 flex-1 text-sm">{task.title}</span>
                             <span className="text-xs text-red-600 dark:text-red-400">{formatDate(task.deadline)}</span>
@@ -3155,7 +3133,7 @@ export default function HouseholdPlanner() {
                       {upcomingTasks.map(task => {
                         const cat = categories.find(c => c._id === task.category);
                         return (
-                          <div key={task._id} className="flex items-center gap-3 bg-white/60 dark:bg-gray-700/60 rounded-lg px-3 py-2">
+                          <div key={task._id} className="flex items-center gap-3 rounded-xl shadow-neo-flat dark:shadow-neo-dark-flat px-3 py-2 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
                             {cat && <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />}
                             <span className="font-medium text-gray-800 dark:text-gray-200 flex-1 text-sm">{task.title}</span>
                             <span className="text-xs text-gray-600 dark:text-gray-400">{formatDate(task.deadline)}</span>
@@ -3179,10 +3157,12 @@ export default function HouseholdPlanner() {
               Aktive Aufgaben ({activeTasks.length})
             </h2>
             {sortedActiveTasks.length === 0 ? (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
-                <Calendar className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+              <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-12 text-center bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+                <div className="inline-block p-4 rounded-2xl shadow-neo-sm dark:shadow-neo-dark-sm mb-4">
+                  <Calendar className="w-16 h-16 text-gray-400 dark:text-gray-600" />
+                </div>
                 <p className="text-gray-500 dark:text-gray-400 text-lg">Keine aktiven Aufgaben</p>
-                <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Gut gemacht! 🎉</p>
+                <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Gut gemacht!</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -3279,7 +3259,7 @@ export default function HouseholdPlanner() {
                               )}
                             </div>
                             {task.description && (
-                              <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded p-2">
+                              <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 rounded-lg shadow-neo-inset dark:shadow-neo-dark-inset p-2">
                                 {task.description}
                               </div>
                             )}
@@ -3287,13 +3267,13 @@ export default function HouseholdPlanner() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => openEditTask(task)}
-                              className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
+                              className="flex-shrink-0 p-2 text-indigo-500 hover:text-indigo-700 rounded-lg transition-colors"
                             >
                               <Edit2 className="w-5 h-5" />
                             </button>
                             <button
                               onClick={() => deleteTask(task._id)}
-                              className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                              className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 rounded-lg transition-colors"
                             >
                               <Trash2 className="w-5 h-5" />
                             </button>
@@ -3309,10 +3289,10 @@ export default function HouseholdPlanner() {
                         const catTasks = grouped[cat._id];
                         const isCollapsed = collapsedCategories[cat._id];
                         return (
-                          <div key={cat._id} className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+                          <div key={cat._id} className="rounded-2xl shadow-neo dark:shadow-neo-dark overflow-hidden bg-[#e0e0e0] dark:bg-[#1e1e2e]">
                             <button
                               onClick={() => toggleCategoryCollapse(cat._id)}
-                              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                              className="w-full flex items-center gap-3 px-4 py-3 hover:opacity-80 transition-all"
                             >
                               <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
                               <h3 className="font-semibold text-gray-800 dark:text-gray-100 flex-1 text-left">{cat.name}</h3>
@@ -3324,7 +3304,7 @@ export default function HouseholdPlanner() {
                               )}
                             </button>
                             {!isCollapsed && (
-                              <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                              <div className="divide-y divide-gray-200/50 dark:divide-gray-700/50">
                                 {catTasks.map(renderTask)}
                               </div>
                             )}
@@ -3332,10 +3312,10 @@ export default function HouseholdPlanner() {
                         );
                       })}
                       {uncategorized.length > 0 && (
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+                        <div className="rounded-2xl shadow-neo dark:shadow-neo-dark overflow-hidden bg-[#e0e0e0] dark:bg-[#1e1e2e]">
                           <button
                             onClick={() => toggleCategoryCollapse('uncategorized')}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:opacity-80 transition-all"
                           >
                             <div className="w-4 h-4 rounded-full flex-shrink-0 bg-gray-400" />
                             <h3 className="font-semibold text-gray-800 dark:text-gray-100 flex-1 text-left">Ohne Kategorie</h3>
@@ -3365,7 +3345,7 @@ export default function HouseholdPlanner() {
             <div>
               <button
                 onClick={() => setShowCompleted(!showCompleted)}
-                className="flex items-center justify-between w-full text-left mb-4 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-shadow"
+                className="flex items-center justify-between w-full text-left mb-4 p-4 rounded-2xl shadow-neo dark:shadow-neo-dark bg-[#e0e0e0] dark:bg-[#1e1e2e] card-neo"
               >
                 <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
                   Erledigte Aufgaben ({completedTasks.length})
@@ -3381,14 +3361,14 @@ export default function HouseholdPlanner() {
                 <>
                   {/* Filter nach "Erledigt von" */}
                   {selectedHousehold && selectedHousehold.memberDetails && selectedHousehold.memberDetails.length > 1 && (
-                    <div className="mb-4 bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+                    <div className="mb-4 rounded-2xl shadow-neo dark:shadow-neo-dark p-4 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Filter: Erledigt von
                       </label>
                       <select
                         value={completedByFilter}
                         onChange={(e) => setCompletedByFilter(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                        className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100"
                       >
                         <option value="all">Alle anzeigen</option>
                         {selectedHousehold.memberDetails.map(member => (
@@ -3406,7 +3386,7 @@ export default function HouseholdPlanner() {
                     return (
                       <div
                         key={task._id}
-                        className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 opacity-70 hover:opacity-100 transition-opacity"
+                        className="rounded-2xl shadow-neo dark:shadow-neo-dark p-4 opacity-70 hover:opacity-100 transition-opacity bg-[#e0e0e0] dark:bg-[#1e1e2e] card-neo"
                       >
                         <div className="flex items-start gap-3">
                           <button
@@ -3476,7 +3456,7 @@ export default function HouseholdPlanner() {
                               )}
                             </div>
                             {task.description && (
-                              <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded p-2 line-through">
+                              <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 rounded-lg shadow-neo-inset dark:shadow-neo-dark-inset p-2 line-through">
                                 {task.description}
                               </div>
                             )}
@@ -3509,14 +3489,16 @@ export default function HouseholdPlanner() {
         )}
 
         {/* Archiv-Ansicht */}
-        {viewMode === 'archive' && (() => {
+        {viewMode === 'archive' && activeTab === 'tasks' && (() => {
           // Filter archivierte Aufgaben nach completedBy
-          const filteredArchivedTasks = completedByFilter !== 'all'
+          let filteredArchivedTasks = completedByFilter !== 'all'
             ? archivedTasks.filter(task => task.completedBy === completedByFilter)
-            : archivedTasks;
+            : [...archivedTasks];
+          // Sortiere archivierte Aufgaben nach Erledigungszeitpunkt (neueste oben)
+          filteredArchivedTasks.sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
 
           return (
-            <div className="space-y-6">
+            <div className="space-y-6 view-transition">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
                   Archiv ({filteredArchivedTasks.length})
@@ -3525,14 +3507,14 @@ export default function HouseholdPlanner() {
 
               {/* Filter nach "Erledigt von" */}
               {selectedHousehold && selectedHousehold.memberDetails && selectedHousehold.memberDetails.length > 1 && (
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+                <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-4 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Filter: Erledigt von
                   </label>
                   <select
                     value={completedByFilter}
                     onChange={(e) => setCompletedByFilter(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg"
+                    className="w-full px-4 py-3 shadow-neo-inset dark:shadow-neo-dark-inset rounded-xl border-none bg-[#e0e0e0] dark:bg-[#1e1e2e] dark:text-gray-100"
                   >
                     <option value="all">Alle anzeigen</option>
                     {selectedHousehold.memberDetails.map(member => (
@@ -3545,8 +3527,10 @@ export default function HouseholdPlanner() {
               )}
 
               {filteredArchivedTasks.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
-                  <Archive className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-12 text-center bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+                  <div className="inline-block p-4 rounded-2xl shadow-neo-sm dark:shadow-neo-dark-sm mb-4">
+                    <Archive className="w-16 h-16 text-gray-400 dark:text-gray-600" />
+                  </div>
                   <p className="text-gray-500 dark:text-gray-400 text-lg">
                     {completedByFilter !== 'all' ? 'Keine archivierten Aufgaben für diesen Filter' : 'Keine archivierten Aufgaben'}
                   </p>
@@ -3560,7 +3544,7 @@ export default function HouseholdPlanner() {
                   return (
                     <div
                       key={task._id}
-                      className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 opacity-60"
+                      className="rounded-2xl shadow-neo dark:shadow-neo-dark p-4 opacity-60 bg-[#e0e0e0] dark:bg-[#1e1e2e]"
                     >
                       <div className="flex items-start gap-3">
                         <Check className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
@@ -3620,8 +3604,8 @@ export default function HouseholdPlanner() {
         })()}
 
         {/* Statistik-Ansicht */}
-        {viewMode === 'statistics' && (
-          <div className="space-y-6">
+        {(viewMode === 'statistics' || activeTab === 'statistics') && (
+          <div className="space-y-6 view-transition">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
                 Statistiken
@@ -3629,7 +3613,7 @@ export default function HouseholdPlanner() {
             </div>
 
             {/* Zeitraum-Auswahl */}
-            <div className="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+            <div className="mb-6 rounded-2xl shadow-neo dark:shadow-neo-dark p-4 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                 Zeitraum
               </label>
@@ -3639,10 +3623,10 @@ export default function HouseholdPlanner() {
                     setStatisticsTimeRange('all');
                     loadStatistics('all');
                   }}
-                  className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                  className={`flex-1 px-4 py-2 rounded-xl transition-all btn-neo ${
                     statisticsTimeRange === 'all'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                      ? 'bg-indigo-600 text-white shadow-neo-sm dark:shadow-neo-dark-sm'
+                      : 'shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 bg-[#e0e0e0] dark:bg-[#1e1e2e]'
                   }`}
                 >
                   Gesamt
@@ -3652,10 +3636,10 @@ export default function HouseholdPlanner() {
                     setStatisticsTimeRange('30days');
                     loadStatistics('30days');
                   }}
-                  className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                  className={`flex-1 px-4 py-2 rounded-xl transition-all btn-neo ${
                     statisticsTimeRange === '30days'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                      ? 'bg-indigo-600 text-white shadow-neo-sm dark:shadow-neo-dark-sm'
+                      : 'shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 bg-[#e0e0e0] dark:bg-[#1e1e2e]'
                   }`}
                 >
                   30 Tage
@@ -3665,10 +3649,10 @@ export default function HouseholdPlanner() {
                     setStatisticsTimeRange('7days');
                     loadStatistics('7days');
                   }}
-                  className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                  className={`flex-1 px-4 py-2 rounded-xl transition-all btn-neo ${
                     statisticsTimeRange === '7days'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                      ? 'bg-indigo-600 text-white shadow-neo-sm dark:shadow-neo-dark-sm'
+                      : 'shadow-neo-sm dark:shadow-neo-dark-sm text-gray-700 dark:text-gray-300 bg-[#e0e0e0] dark:bg-[#1e1e2e]'
                   }`}
                 >
                   7 Tage
@@ -3677,13 +3661,15 @@ export default function HouseholdPlanner() {
             </div>
 
             {statistics.length === 0 ? (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
-                <BarChart className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+              <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-12 text-center bg-[#e0e0e0] dark:bg-[#1e1e2e]">
+                <div className="inline-block p-4 rounded-2xl shadow-neo-sm dark:shadow-neo-dark-sm mb-4">
+                  <BarChart className="w-16 h-16 text-gray-400 dark:text-gray-600" />
+                </div>
                 <p className="text-gray-500 dark:text-gray-400 text-lg">Keine Statistiken verfügbar</p>
                 <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Erledigt Aufgaben, um Statistiken zu sehen</p>
               </div>
             ) : (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+              <div className="rounded-2xl shadow-neo dark:shadow-neo-dark p-6 bg-[#e0e0e0] dark:bg-[#1e1e2e]">
                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
                   Erledigte Aufgaben pro Person
                   {statisticsTimeRange === '7days' && ' (Letzte 7 Tage)'}
@@ -3716,7 +3702,7 @@ export default function HouseholdPlanner() {
                             <p className="text-xs text-gray-500 dark:text-gray-400">Aufgaben</p>
                           </div>
                         </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                        <div className="w-full rounded-full h-3 overflow-hidden shadow-neo-inset dark:shadow-neo-dark-inset">
                           <div
                             className="bg-indigo-600 h-full rounded-full transition-all duration-500"
                             style={{ width: `${percentage}%` }}
@@ -3731,6 +3717,57 @@ export default function HouseholdPlanner() {
           </div>
         )}
       </div>
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-[#e0e0e0] dark:bg-[#1e1e2e] shadow-neo-nav dark:shadow-neo-nav-dark z-40">
+        <div className="max-w-6xl mx-auto flex items-center justify-around px-2 py-2" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
+          <button
+            onClick={() => { handleTabChange('tasks'); setViewMode('tasks'); }}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all btn-neo ${
+              activeTab === 'tasks' ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            <CheckSquare className="w-5 h-5" />
+            <span className="text-xs font-medium">Aufgaben</span>
+          </button>
+          <button
+            onClick={() => { handleTabChange('calendar'); }}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all btn-neo ${
+              activeTab === 'calendar' ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            <Calendar className="w-5 h-5" />
+            <span className="text-xs font-medium">Kalender</span>
+          </button>
+
+          {/* FAB - Neue Aufgabe */}
+          <button
+            onClick={() => setShowAddTask(true)}
+            className="w-14 h-14 -mt-6 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-neo-fab dark:shadow-neo-fab-dark hover:bg-indigo-700 transition-all btn-neo"
+          >
+            <Plus className="w-7 h-7" />
+          </button>
+
+          <button
+            onClick={() => { handleTabChange('statistics'); }}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all btn-neo ${
+              activeTab === 'statistics' ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            <BarChart className="w-5 h-5" />
+            <span className="text-xs font-medium">Statistik</span>
+          </button>
+          <button
+            onClick={() => { handleTabChange('settings'); }}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all btn-neo ${
+              activeTab === 'settings' ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            <Menu className="w-5 h-5" />
+            <span className="text-xs font-medium">Mehr</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }
