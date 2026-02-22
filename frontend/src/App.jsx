@@ -21,6 +21,7 @@ export default function HouseholdPlanner() {
   const FRONTEND_URL = serverUrl ? serverUrl.replace(/\/+$/, '') : '';
   const [isRefreshing, setIsRefreshing] = useState(false);
   const skipAutoRefreshRef = useRef(false);
+  const tasksRef = useRef([]);
 
   const [households, setHouseholds] = useState([]);
   const [selectedHousehold, setSelectedHousehold] = useState(null);
@@ -293,13 +294,6 @@ export default function HouseholdPlanner() {
           headers: { 'Authorization': `Bearer ${authToken || token}` }
         }).then(r => r.json())
       ]);
-
-      console.log('📥 Geladene Tasks vom Backend:', tasksData.length, 'Tasks');
-      const tasksWithAssignment = tasksData.filter(t => t.assignedTo);
-      console.log('   - Tasks mit Zuweisung:', tasksWithAssignment.length);
-      if (tasksWithAssignment.length > 0) {
-        console.log('   - Beispiel:', tasksWithAssignment[0].title, '→', tasksWithAssignment[0].assignedTo);
-      }
 
       setTasks(tasksData);
       setCategories(categoriesData);
@@ -684,13 +678,18 @@ export default function HouseholdPlanner() {
     }
   };
 
-  // Überprüfe Deadlines
+  // tasksRef synchron halten
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+
+  // Überprüfe Deadlines (nur einmal starten, liest tasks über Ref)
   useEffect(() => {
-    if (!currentUser || tasks.length === 0) return;
+    if (!currentUser) return;
 
     const checkDeadlines = () => {
+      const currentTasks = tasksRef.current;
+      if (currentTasks.length === 0) return;
       const now = new Date();
-      tasks.forEach(task => {
+      currentTasks.forEach(task => {
         if (task.completed || !task.deadline) return;
 
         const deadline = new Date(task.deadline);
@@ -713,7 +712,7 @@ export default function HouseholdPlanner() {
     checkDeadlines();
 
     return () => clearInterval(interval);
-  }, [tasks, currentUser]);
+  }, [currentUser]);
 
   // Login
   const handleLogin = async () => {
@@ -961,10 +960,10 @@ export default function HouseholdPlanner() {
 
   // Aufgabe umschalten
   const toggleTask = async (task) => {
-    // Optimistisches Update: UI sofort aktualisieren
+    // Optimistisches Update: UI sofort aktualisieren (inkl. completedBy)
     const newCompleted = !task.completed;
     setTasks(prev => prev.map(t => t._id === task._id
-      ? { ...t, completed: newCompleted, completedAt: newCompleted ? new Date().toISOString() : null }
+      ? { ...t, completed: newCompleted, completedAt: newCompleted ? new Date().toISOString() : null, completedBy: newCompleted ? currentUser?.id : null }
       : t
     ));
 
@@ -984,20 +983,19 @@ export default function HouseholdPlanner() {
       if (!response.ok) {
         // Fehlgeschlagen: Optimistisches Update rückgängig machen
         setTasks(prev => prev.map(t => t._id === task._id
-          ? { ...t, completed: task.completed, completedAt: task.completedAt }
+          ? { ...t, completed: task.completed, completedAt: task.completedAt, completedBy: task.completedBy }
           : t
         ));
         const errorData = await response.json().catch(() => ({}));
         alert(errorData.error || 'Fehler beim Aktualisieren der Aufgabe');
         return;
       }
-
-      const updatedTask = await response.json();
-      setTasks(prev => prev.map(t => t._id === task._id ? updatedTask : t));
+      // Kein zweiter setTasks nötig - optimistisches Update ist korrekt
+      // Server-Daten werden beim nächsten Auto-Refresh synchronisiert
     } catch (error) {
       // Netzwerkfehler: Optimistisches Update rückgängig machen
       setTasks(prev => prev.map(t => t._id === task._id
-        ? { ...t, completed: task.completed, completedAt: task.completedAt }
+        ? { ...t, completed: task.completed, completedAt: task.completedAt, completedBy: task.completedBy }
         : t
       ));
       console.error('Fehler beim Aktualisieren:', error);
