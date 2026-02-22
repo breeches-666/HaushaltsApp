@@ -4,6 +4,8 @@ Eine moderne Web-App zur Verwaltung von Haushaltsaufgaben mit Mehrbenutzer-Haush
 
 **Android-App verfuegbar:** Die aktuelle APK wird bei jedem Push automatisch gebaut und kann unter [Actions](../../actions) heruntergeladen werden.
 
+**Home Assistant Integration:** Ueberfaellige, heute faellige und offene Aufgaben als Sensoren in Home Assistant. Siehe [Home Assistant Integration](#home-assistant-integration) fuer Setup-Anleitung.
+
 ## Features
 
 - Benutzer-Authentifizierung (Login/Registrierung) mit Input-Validierung
