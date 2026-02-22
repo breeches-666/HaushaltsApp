@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Plus, Trash2, Check, X, Bell, User, LogOut, FolderPlus, Settings, Edit2, AlertCircle, ChevronDown, ChevronUp, Users, Mail, Home, RefreshCw, Archive, BarChart, CheckSquare } from 'lucide-react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
@@ -20,6 +20,7 @@ export default function HouseholdPlanner() {
   const API_URL = serverUrl ? `${serverUrl.replace(/\/+$/, '')}/api` : '';
   const FRONTEND_URL = serverUrl ? serverUrl.replace(/\/+$/, '') : '';
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const skipAutoRefreshRef = useRef(false);
 
   const [households, setHouseholds] = useState([]);
   const [selectedHousehold, setSelectedHousehold] = useState(null);
@@ -493,7 +494,9 @@ export default function HouseholdPlanner() {
     if (!selectedHousehold || !token) return;
 
     const intervalId = setInterval(() => {
-      loadHouseholdData(selectedHousehold._id, token);
+      if (!skipAutoRefreshRef.current) {
+        loadHouseholdData(selectedHousehold._id, token);
+      }
     }, 10000); // 10 Sekunden
 
     return () => clearInterval(intervalId);
@@ -867,7 +870,7 @@ export default function HouseholdPlanner() {
       console.log('📥 Empfangene Task vom Backend:', task);
       console.log('   - assignedTo:', task.assignedTo);
 
-      setTasks([...tasks, task]);
+      setTasks(prev => [...prev, task]);
       setNewTask({
         title: '',
         category: '',
@@ -927,7 +930,7 @@ export default function HouseholdPlanner() {
       console.log('📥 Empfangene aktualisierte Task:', updatedTask);
       console.log('   - assignedTo:', updatedTask.assignedTo);
 
-      setTasks(tasks.map(t => t._id === updatedTask._id ? updatedTask : t));
+      setTasks(prev => prev.map(t => t._id === updatedTask._id ? updatedTask : t));
       setShowEditTask(false);
       setEditingTask(null);
     } catch (error) {
@@ -950,7 +953,7 @@ export default function HouseholdPlanner() {
       if (!response.ok) throw new Error('Fehler beim Aktualisieren');
 
       const updatedTask = await response.json();
-      setTasks(tasks.map(t => t._id === taskId ? updatedTask : t));
+      setTasks(prev => prev.map(t => t._id === taskId ? updatedTask : t));
     } catch (error) {
       console.error('Fehler beim Aktualisieren:', error);
     }
@@ -958,7 +961,51 @@ export default function HouseholdPlanner() {
 
   // Aufgabe umschalten
   const toggleTask = async (task) => {
-    await updateTask(task._id, { completed: !task.completed });
+    // Optimistisches Update: UI sofort aktualisieren
+    const newCompleted = !task.completed;
+    setTasks(prev => prev.map(t => t._id === task._id
+      ? { ...t, completed: newCompleted, completedAt: newCompleted ? new Date().toISOString() : null }
+      : t
+    ));
+
+    // Auto-Refresh pausieren, damit er das optimistische Update nicht überschreibt
+    skipAutoRefreshRef.current = true;
+
+    try {
+      const response = await fetch(`${API_URL}/tasks/${task._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ completed: newCompleted }),
+      });
+
+      if (!response.ok) {
+        // Fehlgeschlagen: Optimistisches Update rückgängig machen
+        setTasks(prev => prev.map(t => t._id === task._id
+          ? { ...t, completed: task.completed, completedAt: task.completedAt }
+          : t
+        ));
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.error || 'Fehler beim Aktualisieren der Aufgabe');
+        return;
+      }
+
+      const updatedTask = await response.json();
+      setTasks(prev => prev.map(t => t._id === task._id ? updatedTask : t));
+    } catch (error) {
+      // Netzwerkfehler: Optimistisches Update rückgängig machen
+      setTasks(prev => prev.map(t => t._id === task._id
+        ? { ...t, completed: task.completed, completedAt: task.completedAt }
+        : t
+      ));
+      console.error('Fehler beim Aktualisieren:', error);
+      alert('Netzwerkfehler beim Aktualisieren der Aufgabe');
+    } finally {
+      // Auto-Refresh nach kurzer Verzögerung wieder aktivieren
+      setTimeout(() => { skipAutoRefreshRef.current = false; }, 2000);
+    }
   };
 
   // Aufgabe löschen
@@ -973,7 +1020,7 @@ export default function HouseholdPlanner() {
 
       if (!response.ok) throw new Error('Fehler beim Löschen');
 
-      setTasks(tasks.filter(t => t._id !== taskId));
+      setTasks(prev => prev.filter(t => t._id !== taskId));
     } catch (error) {
       alert('Fehler beim Löschen der Aufgabe');
     }
@@ -3174,13 +3221,15 @@ export default function HouseholdPlanner() {
                           )}
                           <button
                             onClick={() => toggleTask(task)}
-                            className={`mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                            className={`flex-shrink-0 w-10 h-10 -m-2 rounded-lg flex items-center justify-center transition-colors`}
+                          >
+                            <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
                               task.completed
                                 ? 'bg-green-500 border-green-500'
-                                : 'border-gray-300 dark:border-gray-600 hover:border-green-500'
-                            }`}
-                          >
-                            {task.completed && <Check className="w-4 h-4 text-white" />}
+                                : 'border-gray-300 dark:border-gray-600'
+                            }`}>
+                              {task.completed && <Check className="w-4 h-4 text-white" />}
+                            </div>
                           </button>
                           <div className="flex-1 min-w-0">
                             <h3 className={`font-medium ${isOverdue ? 'text-red-700 dark:text-red-400 font-bold' : 'text-gray-800 dark:text-gray-100'}`}>
@@ -3364,9 +3413,11 @@ export default function HouseholdPlanner() {
                         <div className="flex items-start gap-3">
                           <button
                             onClick={() => toggleTask(task)}
-                            className="mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 bg-green-500 border-green-500 flex items-center justify-center transition-colors"
+                            className="flex-shrink-0 w-10 h-10 -m-2 rounded-lg flex items-center justify-center transition-colors"
                           >
-                            <Check className="w-4 h-4 text-white" />
+                            <div className="w-6 h-6 rounded-md border-2 bg-green-500 border-green-500 flex items-center justify-center">
+                              <Check className="w-4 h-4 text-white" />
+                            </div>
                           </button>
 
                           <div className="flex-1 min-w-0">
