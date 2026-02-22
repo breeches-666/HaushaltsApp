@@ -42,6 +42,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 
 // Rate Limiting
@@ -61,7 +62,7 @@ const registerLimiter = rateLimit({
 });
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 Minute
-  max: 100,
+  max: 300,
   message: { error: 'Zu viele Anfragen. Bitte versuche es später erneut.' },
   standardHeaders: true,
   legacyHeaders: false
