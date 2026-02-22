@@ -18,6 +18,7 @@ Eine moderne Web-App zur Verwaltung von Haushaltsaufgaben mit Mehrbenutzer-Haush
 - Rate Limiting und Security Hardening
 - Docker-Support fuer einfaches Self-Hosting
 - Android-App via Capacitor (APK)
+- Home Assistant Integration (Custom Component mit HACS-Support)
 
 ## Schnellstart
 
@@ -222,12 +223,40 @@ DELETE /api/categories/:id                     Kategorie loeschen
 ### Terminal-Modus
 ```
 GET    /api/terminal/auth                      Terminal authentifizieren
+GET    /api/terminal/ha-dashboard              Home Assistant Dashboard-Daten
 ```
 
 ### System
 ```
 GET    /health                                 Health Check
 ```
+
+## Home Assistant Integration
+
+Die HaushaltsApp laesst sich als Custom Integration in Home Assistant einbinden. Ueberfaellige, heute faellige und offene Aufgaben werden als Sensoren bereitgestellt und koennen in Lovelace-Dashboards angezeigt werden.
+
+### Installation
+
+1. Den Ordner `homeassistant/custom_components/haushaltsapp/` nach `config/custom_components/haushaltsapp/` in der Home Assistant Installation kopieren
+2. Home Assistant neu starten
+3. Unter **Einstellungen → Geraete & Dienste → Integration hinzufuegen** nach "HaushaltsApp" suchen
+4. Server-URL und Terminal-Token eingeben (Token wird in der App unter Haushalt-Einstellungen generiert)
+
+Alternativ kann die Integration ueber [HACS](https://hacs.xyz/) als Custom Repository hinzugefuegt werden.
+
+### Sensoren
+
+| Sensor | State | Beschreibung |
+|---|---|---|
+| `sensor.haushaltsapp_offene_aufgaben` | Gesamtanzahl | Alle offenen Aufgaben mit vollstaendiger Summary in den Attributen |
+| `sensor.haushaltsapp_uberfallige_aufgaben` | Anzahl | Aufgaben deren Deadline ueberschritten ist |
+| `sensor.haushaltsapp_heutige_aufgaben` | Anzahl | Heute faellige Aufgaben |
+
+Die Sensoren werden alle 5 Minuten aktualisiert. Detaillierte Aufgabenlisten, Kategorie-Statistiken und Personen-Zuordnungen sind als Attribute verfuegbar.
+
+### Lovelace
+
+Ein Beispiel-Dashboard mit Markdown Card, Entities Card und Conditional Card liegt in [`homeassistant/lovelace-example.yaml`](homeassistant/lovelace-example.yaml).
 
 ## Android APK
 
