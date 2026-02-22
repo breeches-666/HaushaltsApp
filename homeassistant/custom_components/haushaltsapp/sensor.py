@@ -58,8 +58,9 @@ class HaushaltsAppBaseSensor(CoordinatorEntity[HaushaltsAppCoordinator], SensorE
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
-            name=f"HaushaltsApp {household_name}",
+            name="HaushaltsApp",
             manufacturer="HaushaltsApp",
+            model=household_name,
             entry_type=DeviceEntryType.SERVICE,
         )
 
