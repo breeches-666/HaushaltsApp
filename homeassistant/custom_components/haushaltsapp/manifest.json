@@ -1,0 +1,9 @@
+{
+  "domain": "haushaltsapp",
+  "name": "HaushaltsApp",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/yourusername/HaushaltsApp",
+  "iot_class": "cloud_polling",
+  "version": "1.0.0"
+}

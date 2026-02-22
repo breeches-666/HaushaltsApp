@@ -717,6 +717,123 @@ app.get('/api/terminal/auth', authenticateTerminal, async (req, res) => {
   }
 });
 
+// Home Assistant Dashboard Endpoint
+app.get('/api/terminal/ha-dashboard', authenticateTerminal, async (req, res) => {
+  try {
+    const household = req.terminalHousehold;
+    const householdId = household._id.toString();
+
+    // Load tasks, categories, and members in parallel
+    const [tasks, categories, members] = await Promise.all([
+      Task.find({ householdId, completed: false, archived: { $ne: true } }),
+      Category.find({ householdId }),
+      User.find({ _id: { $in: household.members } }).select('name _id')
+    ]);
+
+    // Build lookup maps
+    const categoryMap = {};
+    for (const cat of categories) {
+      categoryMap[cat._id.toString()] = { name: cat.name, color: cat.color };
+    }
+    const memberMap = {};
+    for (const member of members) {
+      memberMap[member._id.toString()] = member.name;
+    }
+
+    // Calculate today boundaries in Europe/Berlin (same pattern as cron job)
+    const now = new Date();
+    const timezone = 'Europe/Berlin';
+    const utcRef = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const userRef = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+    const offsetMs = userRef.getTime() - utcRef.getTime();
+    const todayStart = new Date(Date.UTC(userRef.getFullYear(), userRef.getMonth(), userRef.getDate(), 0, 0, 0) - offsetMs);
+    const todayEnd = new Date(Date.UTC(userRef.getFullYear(), userRef.getMonth(), userRef.getDate(), 23, 59, 59, 999) - offsetMs);
+
+    // Classify and enrich tasks
+    const overdue = [];
+    const dueToday = [];
+    const noDeadline = [];
+
+    const byCategory = {};
+    const byPerson = {};
+    const byPriority = { high: 0, medium: 0, low: 0 };
+
+    for (const task of tasks) {
+      const cat = categoryMap[task.category] || { name: 'Unbekannt', color: '#9ca3af' };
+      const assignedToNames = (task.assignedTo || [])
+        .map(id => memberMap[id])
+        .filter(Boolean);
+
+      const enriched = {
+        id: task._id.toString(),
+        title: task.title,
+        categoryName: cat.name,
+        categoryColor: cat.color,
+        deadline: task.deadline || null,
+        assignedToNames,
+        priority: task.priority || 'medium',
+        description: task.description || ''
+      };
+
+      // Classify
+      if (!task.deadline) {
+        noDeadline.push(enriched);
+      } else if (task.deadline < todayStart) {
+        overdue.push(enriched);
+      } else if (task.deadline <= todayEnd) {
+        dueToday.push(enriched);
+      } else {
+        // Future deadline - not included in response
+        continue;
+      }
+
+      // Count statistics
+      const catKey = cat.name;
+      if (!byCategory[catKey]) {
+        byCategory[catKey] = { categoryName: cat.name, categoryColor: cat.color, count: 0 };
+      }
+      byCategory[catKey].count++;
+
+      for (const name of assignedToNames) {
+        if (!byPerson[name]) {
+          byPerson[name] = { userName: name, count: 0 };
+        }
+        byPerson[name].count++;
+      }
+
+      const prio = enriched.priority;
+      if (byPriority[prio] !== undefined) {
+        byPriority[prio]++;
+      }
+    }
+
+    const totalOpen = overdue.length + dueToday.length + noDeadline.length;
+
+    res.json({
+      household: { id: householdId, name: household.name },
+      members: members.map(m => ({ id: m._id.toString(), name: m.name })),
+      summary: {
+        totalOpen,
+        overdueCount: overdue.length,
+        dueTodayCount: dueToday.length,
+        noDeadlineCount: noDeadline.length,
+        byCategory: Object.values(byCategory),
+        byPerson: Object.values(byPerson),
+        byPriority
+      },
+      tasks: {
+        overdue,
+        due_today: dueToday,
+        no_deadline: noDeadline
+      },
+      lastUpdated: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('HA Dashboard Fehler:', error);
+    res.status(500).json({ error: 'Fehler beim Laden des Dashboards' });
+  }
+});
+
 // Task Routes
 app.get('/api/tasks', authenticateAny, async (req, res) => {
   try {

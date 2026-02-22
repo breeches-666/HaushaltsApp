@@ -1,0 +1,104 @@
+# HaushaltsApp Lovelace Dashboard Beispiel
+# Ersetze "haushaltsapp" durch deine Entity-IDs falls abweichend.
+
+# ============================================================
+# 1) Schnellübersicht - Entities Card
+# ============================================================
+type: entities
+title: HaushaltsApp Übersicht
+entities:
+  - entity: sensor.haushaltsapp_offene_aufgaben
+    name: Offene Aufgaben
+    icon: mdi:clipboard-list
+  - entity: sensor.haushaltsapp_uberfallige_aufgaben
+    name: Überfällige Aufgaben
+    icon: mdi:alert-circle
+  - entity: sensor.haushaltsapp_heutige_aufgaben
+    name: Heutige Aufgaben
+    icon: mdi:calendar-today
+
+---
+
+# ============================================================
+# 2) Warnung bei überfälligen Aufgaben - Conditional Card
+# ============================================================
+type: conditional
+conditions:
+  - condition: numeric_state
+    entity: sensor.haushaltsapp_uberfallige_aufgaben
+    above: 0
+card:
+  type: markdown
+  content: >-
+    ## ⚠️ Überfällige Aufgaben
+
+    {% set tasks = state_attr('sensor.haushaltsapp_uberfallige_aufgaben', 'overdue') %}
+    {% if tasks %}
+    {% for task in tasks %}
+    - {% if task.priority == 'high' %}🔴{% elif task.priority == 'medium' %}🟡{% else %}🟢{% endif %}
+    **{{ task.title }}** ({{ task.categoryName }})
+    {% if task.assignedToNames | length > 0 %} → {{ task.assignedToNames | join(', ') }}{% endif %}
+    {% if task.deadline %} — Fällig: {{ task.deadline[:10] }}{% endif %}
+    {% endfor %}
+    {% endif %}
+
+---
+
+# ============================================================
+# 3) Vollständiges Dashboard - Markdown Card
+# ============================================================
+type: markdown
+title: Aufgaben Dashboard
+content: >-
+  {% set overdue = state_attr('sensor.haushaltsapp_offene_aufgaben', 'tasks')['overdue'] %}
+  {% set today = state_attr('sensor.haushaltsapp_offene_aufgaben', 'tasks')['due_today'] %}
+  {% set nodeadline = state_attr('sensor.haushaltsapp_offene_aufgaben', 'tasks')['no_deadline'] %}
+  {% set summary = state_attr('sensor.haushaltsapp_offene_aufgaben', 'summary') %}
+
+  **{{ states('sensor.haushaltsapp_offene_aufgaben') }} offene Aufgaben**
+  ({{ summary.overdueCount }} überfällig · {{ summary.dueTodayCount }} heute · {{ summary.noDeadlineCount }} ohne Deadline)
+
+  ---
+
+  {% if overdue | length > 0 %}
+  ### 🔴 Überfällig ({{ overdue | length }})
+  {% for task in overdue %}
+  - {% if task.priority == 'high' %}🔴{% elif task.priority == 'medium' %}🟡{% else %}🟢{% endif %}
+  **{{ task.title }}** · {{ task.categoryName }}
+  {% if task.assignedToNames | length > 0 %}· {{ task.assignedToNames | join(', ') }}{% endif %}
+  · Fällig: {{ task.deadline[:10] }}
+  {% endfor %}
+
+  ---
+  {% endif %}
+
+  {% if today | length > 0 %}
+  ### 📅 Heute fällig ({{ today | length }})
+  {% for task in today %}
+  - {% if task.priority == 'high' %}🔴{% elif task.priority == 'medium' %}🟡{% else %}🟢{% endif %}
+  **{{ task.title }}** · {{ task.categoryName }}
+  {% if task.assignedToNames | length > 0 %}· {{ task.assignedToNames | join(', ') }}{% endif %}
+  {% endfor %}
+
+  ---
+  {% endif %}
+
+  {% if nodeadline | length > 0 %}
+  ### 📋 Ohne Deadline ({{ nodeadline | length }})
+  {% for task in nodeadline %}
+  - {% if task.priority == 'high' %}🔴{% elif task.priority == 'medium' %}🟡{% else %}🟢{% endif %}
+  **{{ task.title }}** · {{ task.categoryName }}
+  {% if task.assignedToNames | length > 0 %}· {{ task.assignedToNames | join(', ') }}{% endif %}
+  {% endfor %}
+  {% endif %}
+
+  ---
+
+  {% if summary.byCategory | length > 0 %}
+  ### Nach Kategorie
+  {% for cat in summary.byCategory %}
+  - {{ cat.categoryName }}: {{ cat.count }}
+  {% endfor %}
+  {% endif %}
+
+  *Zuletzt aktualisiert: {{ state_attr('sensor.haushaltsapp_offene_aufgaben', 'last_updated') }}*

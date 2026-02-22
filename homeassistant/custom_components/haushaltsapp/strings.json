@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "HaushaltsApp verbinden",
+        "description": "Gib die Server-URL und den Terminal-Token aus den Haushalt-Einstellungen ein.",
+        "data": {
+          "url": "Server-URL",
+          "token": "Terminal-Token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zum Server fehlgeschlagen",
+      "invalid_auth": "Ung\u00fcltiger Token"
+    },
+    "abort": {
+      "already_configured": "Dieser Haushalt ist bereits konfiguriert"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "open_tasks": {
+        "name": "Offene Aufgaben"
+      },
+      "overdue_tasks": {
+        "name": "\u00dcberf\u00e4llige Aufgaben"
+      },
+      "today_tasks": {
+        "name": "Heutige Aufgaben"
+      }
+    }
+  }
+}
