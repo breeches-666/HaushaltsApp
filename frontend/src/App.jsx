@@ -266,14 +266,32 @@ export default function HouseholdPlanner() {
   }, [token]);
 
   // Lade Haushalte
+  // Auth-Fehler behandeln (abgelaufener Token → automatisch ausloggen)
+  const handleAuthError = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('selectedHousehold');
+    setToken(null);
+    setCurrentUser(null);
+    setShowLogin(true);
+    setTasks([]);
+    setCategories([]);
+    setHouseholds([]);
+  };
+
   const loadHouseholds = async (authToken) => {
     try {
       const response = await fetch(`${API_URL}/households`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
+      if (response.status === 401 || response.status === 403) {
+        handleAuthError();
+        return;
+      }
       const data = await response.json();
+      if (!Array.isArray(data)) return;
       setHouseholds(data);
-      
+
       // Wähle ersten Haushalt automatisch
       if (data.length > 0) {
         const savedHouseholdId = localStorage.getItem('selectedHousehold');
